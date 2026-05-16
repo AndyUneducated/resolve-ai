@@ -18,11 +18,19 @@ get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)
-def _reset_stripe_store() -> None:
-    """Stripe MCP fake data lives in module-level state; reset between tests."""
-    try:
-        from mcp_servers.stripe import data as stripe_data
-
-        stripe_data.reset_store()
-    except ImportError:
-        pass
+def _reset_mcp_stores() -> None:
+    """All mock MCP servers keep module-level state; reset between tests."""
+    for module_name in (
+        "mcp_servers.stripe.data",
+        "mcp_servers.zendesk.data",
+        "mcp_servers.slack.data",
+        "mcp_servers.salesforce.data",
+        "mcp_servers.intercom.data",
+    ):
+        try:
+            module = __import__(module_name, fromlist=["reset_store"])
+        except ImportError:
+            continue
+        reset = getattr(module, "reset_store", None)
+        if callable(reset):
+            reset()

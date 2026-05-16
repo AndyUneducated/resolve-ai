@@ -72,3 +72,6 @@ exclude = ["build", "dist", "apps/web"]
 addopts = "-ra --strict-markers"
 testpaths = ["apps/api/tests", "packages", "e2e_tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: live Ollama / external services (slow; run with pytest apps/api/tests/test_llm_live.py)",
+]

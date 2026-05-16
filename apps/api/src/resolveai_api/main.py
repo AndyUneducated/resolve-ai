@@ -12,7 +12,7 @@ from resolveai_api.agents.supervisor import SupervisorGraph
 from resolveai_api.api import chat, health, tickets
 from resolveai_api.config import get_settings
 from resolveai_api.core.checkpointer import lifespan_checkpointer
-from resolveai_api.mcp.loader import build_client, load_tools
+from resolveai_api.mcp.toolbelt import ToolBelt
 from resolveai_api.observability.tracing import setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -26,18 +26,13 @@ async def lifespan(app: FastAPI):
     async with AsyncExitStack() as stack:
         checkpointer = await stack.enter_async_context(lifespan_checkpointer())
 
-        # Discover MCP tools eagerly — failures here should not block the API.
-        try:
-            client = build_client()
-            mcp_tools = await load_tools(client)
-            logger.info("loaded %d MCP tools", len(mcp_tools))
-        except Exception:  # pragma: no cover — defensive
-            logger.exception("MCP tool loading failed; serving with 0 tools")
-            mcp_tools = []
+        toolbelt = await ToolBelt.from_settings()
+        logger.info("ToolBelt loaded %d MCP tools", len(toolbelt))
 
         app.state.checkpointer = checkpointer
-        app.state.mcp_tools = mcp_tools
-        app.state.supervisor = SupervisorGraph(checkpointer=checkpointer, mcp_tools=mcp_tools)
+        app.state.toolbelt = toolbelt
+        app.state.mcp_tools = toolbelt.tools  # back-compat for any direct readers
+        app.state.supervisor = SupervisorGraph(checkpointer=checkpointer, toolbelt=toolbelt)
         yield
 
 

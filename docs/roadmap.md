@@ -24,11 +24,16 @@
 
 详细技术方案见 [`docs/milestone-2-plan.md`](milestone-2-plan.md)。
 
-## Milestone 3 · 5 SaaS 全 MCP-ize（3 days）🧱
+## Milestone 3 · 5 SaaS 全 MCP-ize（3 days）🧱 — ✅ Done
 
-- [ ] Zendesk / Slack / Salesforce / Intercom 全部按 MCP server 实现 + 测试
-- [ ] `ToolBelt` 自动从 MCP discovery 拉 tool spec
-- [ ] capability whitelist 起作用（write tool 必须 explicit grant）
+- [x] Zendesk / Slack / Salesforce / Intercom 全部按 `mcp.server.lowlevel.Server + stdio_server` 实装（mirror Stripe），各自 7 条单测覆盖 happy path + 错误路径
+- [x] `mcp/toolbelt.py` `ToolBelt`：`from_settings()` 走 `MultiServerMCPClient` 自动 discovery，`for_agent(whitelist)` 切片、`by_capability` 分组、`manifest()` 序列化；5-server discovery 烟测覆盖（`test_toolbelt.py`）
+- [x] Executor 升级到三档 capability（read/write/destructive），write 与 destructive 必须显式 grant；destructive 调用 `audit=True`
+- [x] Escalation Agent 走真实 `slack.notify_team` + `zendesk.escalate`；Technical Agent 通过 `zendesk.get_ticket_history` 拉历史 context
+- [x] `.env.example` 默认启用 5 个 `MCP_*_CMD`；`conftest.py` 重置全部 mock store
+- [x] 65/65 单元 + 集成测试绿（含 5-server discovery 烟测）
+
+详细技术方案见 [`docs/milestone-3-plan.md`](milestone-3-plan.md)。
 
 ## Milestone 4 · 四层 Guardrails 真跑（2-3 days）🧱
 

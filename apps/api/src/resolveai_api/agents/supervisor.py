@@ -2,7 +2,7 @@
 
 Compile-time wiring:
 - `checkpointer` (AsyncPostgresSaver | MemorySaver) for stateful handoff & resume.
-- `mcp_tools` (already capability-annotated by `mcp/loader.py`) filtered per-Agent.
+- `toolbelt` (M3) or legacy `mcp_tools` list: discovered MCP tools, sliced per-agent.
 
 Per-request:
 - `thread_id = "{tenant}::{customer}::{thread}"` is namespaced for cross-tenant
@@ -33,23 +33,23 @@ from resolveai_api.core.executor import Executor
 from resolveai_api.guardrails.input_filter import InputGuardrail
 from resolveai_api.guardrails.memory_isolator import MemoryIsolator
 from resolveai_api.guardrails.output_filter import OutputGuardrail
-from resolveai_api.mcp.loader import filter_by_whitelist
+from resolveai_api.mcp.toolbelt import ToolBelt
 
 
-def _build_agents(mcp_tools: list[BaseTool]) -> dict[str, object]:
+def _build_agents(toolbelt: ToolBelt) -> dict[str, object]:
     executor = Executor()
     return {
         "triage": TriageAgent.default(tools=[], executor=executor),
         "billing": BillingAgent.default(
-            tools=filter_by_whitelist(mcp_tools, BILLING_WHITELIST),
+            tools=toolbelt.for_agent(BILLING_WHITELIST),
             executor=executor,
         ),
         "technical": TechnicalAgent.default(
-            tools=filter_by_whitelist(mcp_tools, TECHNICAL_WHITELIST),
+            tools=toolbelt.for_agent(TECHNICAL_WHITELIST),
             executor=executor,
         ),
         "escalation": EscalationAgent.default(
-            tools=filter_by_whitelist(mcp_tools, ESCALATION_WHITELIST),
+            tools=toolbelt.for_agent(ESCALATION_WHITELIST),
             executor=executor,
         ),
     }
@@ -76,16 +76,24 @@ def _extract_text(msg: BaseMessage | dict | object) -> str:
 
 
 class SupervisorGraph:
-    """LangGraph supervisor wired with checkpointer + MCP tools."""
+    """LangGraph supervisor wired with checkpointer + a ToolBelt.
+
+    `toolbelt` is the M3 surface; `mcp_tools` is kept for backwards compatibility
+    so existing tests (and any caller that already filtered tools) keep working.
+    """
 
     def __init__(
         self,
         *,
         checkpointer: BaseCheckpointSaver,
+        toolbelt: ToolBelt | None = None,
         mcp_tools: list[BaseTool] | None = None,
     ) -> None:
+        if toolbelt is None:
+            toolbelt = ToolBelt(mcp_tools or [])
         self.checkpointer = checkpointer
-        self.agents = _build_agents(mcp_tools or [])
+        self.toolbelt = toolbelt
+        self.agents = _build_agents(toolbelt)
         self.input_guard = InputGuardrail()
         self.output_guard = OutputGuardrail()
         self.graph = self._build_graph()
