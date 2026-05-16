@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# uv
+uv.lock
+.python-version
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs / DB
+*.log
+logs/
+*.sqlite
+*.db
+data/
+
+# OTel / traces
+.otel/
+traces/
+
+# Test artefacts
+.coverage.*
+coverage.xml
+junit.xml
+test-results/
+playwright-report/

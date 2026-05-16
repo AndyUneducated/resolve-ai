@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: resolveai-postgres
+    environment:
+      POSTGRES_USER: resolveai
+      POSTGRES_PASSWORD: resolveai
+      POSTGRES_DB: resolveai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resolveai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # OTel collector (可选 — 留位给 EvalGate 集成)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: resolveai-otel
+    command: ["--config=/etc/otel-config.yaml"]
+    volumes:
+      - ./infra/docker/otel-config.yaml:/etc/otel-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    profiles: ["obs"]
+
+volumes:
+  postgres_data:

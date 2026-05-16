@@ -1,0 +1,29 @@
+"""MCP server 注册中心 — 配置驱动的可插拔接入。
+
+新增 SaaS = 加一个 MCP server entry，agent 不用动代码。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from resolveai_api.config import get_settings
+
+
+@dataclass
+class McpServerSpec:
+    name: str  # eg. "stripe"
+    cmd: str  # stdio 启动命令
+    transport: str = "stdio"  # 也支持 "http" 用于生产
+
+
+def default_servers() -> list[McpServerSpec]:
+    s = get_settings()
+    transport = s.mcp_transport
+    return [
+        McpServerSpec("zendesk", s.mcp_zendesk_cmd, transport),
+        McpServerSpec("stripe", s.mcp_stripe_cmd, transport),
+        McpServerSpec("slack", s.mcp_slack_cmd, transport),
+        McpServerSpec("salesforce", s.mcp_salesforce_cmd, transport),
+        McpServerSpec("intercom", s.mcp_intercom_cmd, transport),
+    ]
