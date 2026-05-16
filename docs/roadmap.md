@@ -6,7 +6,7 @@
 > 🧱 = 必做地基（table stakes，进面试的最低要求）
 > ⭐ = 差异化里程碑（top 10% → top 3% 的关键 leverage，**别跳过**）
 
-## Milestone 1 · Hello-World 流通（1 day）🧱
+## Milestone 1 · Hello-World 流通（1 day）🧱 — ✅ Done
 
 - [x] `make install` 跑通（uv sync + npm install）
 - [x] `make api` 起后端，`GET /` 200
