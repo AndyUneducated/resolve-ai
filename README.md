@@ -1,4 +1,4 @@
-# Adversarially-Hardened Multi-Agent Customer Support
+# 对抗加固的多 Agent 客服系统
 
 [![CI](https://github.com/AndyUneducated/resolve-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndyUneducated/resolve-ai/actions/workflows/ci.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -27,7 +27,7 @@
 [![ESLint](https://img.shields.io/badge/ESLint-4B32C3.svg?logo=eslint&logoColor=white)](https://eslint.org/)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
-> 内部代号 **ResolveAI** — Sierra / Decagon 风格的客服多 Agent 系统：4 个专项 Agent 接力处理 ticket，5 个 SaaS 工具走 MCP 协议，T&S 背景背书的四层 adversarial guardrails。
+> 内部代号 **ResolveAI** —— Sierra / Decagon 风格的客服多 Agent 系统：4 个专项 Agent 接力处理 ticket，5 个 SaaS 工具走 MCP 协议，T&S 背景背书的四层 adversarial guardrails。
 
 ## 为什么需要 ResolveAI
 
@@ -149,27 +149,15 @@ make red-team   # 200 个 adversarial prompt，期望 0 PII leak
 
 ## 项目状态
 
-🚧 **Scaffold 阶段** — 当前提交搭建了完整的目录骨架与可运行 hello-world endpoint，下一步按 [`docs/roadmap.md`](docs/roadmap.md) 逐模块填充实现。
+🚧 **Scaffold 阶段** —— 当前提交搭建了完整的目录骨架与可运行 hello-world endpoint，下一步按 [`docs/roadmap.md`](docs/roadmap.md) 逐模块填充实现。
 
-## Contributing
+## 贡献
 
-欢迎 issue / PR — 尤其是新增 MCP server、补强 guardrails、或扩充 red-team 测试集。
-
-1. **Fork & clone**，按上面 [快速开始](#快速开始) 跑通本地 dev 环境（Python 3.11+ / Node 20+ / Docker）。
-2. **装依赖**：`make install`（uv workspace + `apps/web` npm install）。
-3. **本地校验四件套**（与 CI 一致）：
-   ```bash
-   make lint        # ruff + eslint
-   make typecheck   # mypy + tsc
-   make test        # pytest + next lint
-   make red-team    # 200 个 adversarial prompt，期望 0 PII leak
-   ```
-4. **commit 之前**：`make fmt` 自动修复 Python / 前端格式；新增 Python 包记得加进 `[tool.uv.workspace] members`。
-5. **重要技术决策**写进 [`docs/design.md`](docs/design.md) 或新建 `DECISIONS.md`（ADR 风格）；阶段性进展更新 `docs/roadmap.md`。
-6. **CI 必须通过**：`backend` (uv / ruff / pytest) 与 `frontend` (Next.js lint) 两个 job 都要绿。
+欢迎 issue / PR —— 尤其是新增 MCP server、补强 guardrails、或扩充 red-team 测试集。
+完整的本地开发与提交流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 较大改动（新增 Agent / 修改 handoff 协议 / 切换 LLM provider）请先开 issue 讨论。
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache License 2.0 —— 详见 [LICENSE](LICENSE)。
