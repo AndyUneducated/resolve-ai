@@ -22,8 +22,8 @@ make seed
 
 要求：
 
-- Python 3.11+（推荐 uv）
-- Node.js 20+
+- Python 3.12+（推荐 uv）
+- Node.js 22+
 - Docker / Docker Compose（Postgres + pgvector）
 
 ## 2. 启动 dev

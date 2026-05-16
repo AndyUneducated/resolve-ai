@@ -88,11 +88,12 @@ function ChatPageContent() {
           if (!jsonPart) continue;
           try {
             const payload = JSON.parse(jsonPart) as Record<string, unknown>;
-            if (typeof payload.agent === "string") {
+            const agent = payload.agent;
+            if (typeof agent === "string") {
               setSteps((prev) => [
                 ...prev,
                 {
-                  agent: payload.agent,
+                  agent,
                   content: String(payload.content ?? ""),
                   flags: Array.isArray(payload.flags)
                     ? (payload.flags as string[])

@@ -20,8 +20,7 @@ env/
 htmlcov/
 .tox/
 
-# uv — keep `uv.lock` in git for reproducible CI (`uv sync --frozen`).
-.python-version
+# uv — keep `uv.lock` and `.python-version` in git for reproducible CI (`uv sync --frozen`).
 
 # Node
 node_modules/

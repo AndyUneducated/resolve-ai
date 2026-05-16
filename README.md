@@ -7,11 +7,11 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![repo size](https://img.shields.io/github/repo-size/AndyUneducated/resolve-ai)](https://github.com/AndyUneducated/resolve-ai)
 
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![uv](https://img.shields.io/badge/uv-workspace-261230.svg?logo=astral&logoColor=white)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E92063.svg?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-supervisor-1C3C3C.svg?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.3+-1C3C3C.svg?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C.svg?logo=langchain&logoColor=white)](https://www.langchain.com/)
 [![MCP](https://img.shields.io/badge/MCP-tools-7C3AED.svg)](https://modelcontextprotocol.io/)
 [![pgvector](https://img.shields.io/badge/Postgres-pgvector-4169E1.svg?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
@@ -20,11 +20,11 @@
 [![gVisor](https://img.shields.io/badge/gVisor-sandbox-4285F4.svg?logo=google&logoColor=white)](https://gvisor.dev/)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-425CC7.svg?logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
 [![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC.svg?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-[![Next.js 14](https://img.shields.io/badge/Next.js-14-000000.svg?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15-000000.svg?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4.svg?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![ESLint](https://img.shields.io/badge/ESLint-4B32C3.svg?logo=eslint&logoColor=white)](https://eslint.org/)
+[![ESLint 9](https://img.shields.io/badge/ESLint-9-4B32C3.svg?logo=eslint&logoColor=white)](https://eslint.org/)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 > 内部代号 **ResolveAI** —— Sierra / Decagon 风格的客服多 Agent 系统：4 个专项 Agent 接力处理 ticket，5 个 SaaS 工具走 MCP 协议，T&S 背景背书的四层 adversarial guardrails。
@@ -103,8 +103,8 @@ resolve-ai/
 
 ### 0. 前置要求
 
-- Python 3.11+ （推荐用 [`uv`](https://docs.astral.sh/uv/)）
-- Node.js 20+ （前端）
+- Python 3.12+ （推荐用 [`uv`](https://docs.astral.sh/uv/)）
+- Node.js 22+ （前端）
 - Docker / Docker Compose （Postgres + pgvector）
 
 ### 1. 安装依赖
