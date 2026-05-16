@@ -1,7 +1,7 @@
 # Adversarially-Hardened Multi-Agent Customer Support
 
 [![CI](https://github.com/AndyUneducated/resolve-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndyUneducated/resolve-ai/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -123,4 +123,4 @@ make red-team   # 200 个 adversarial prompt，期望 0 PII leak
 
 ## License
 
-MIT
+Apache License 2.0 — see [LICENSE](LICENSE).
