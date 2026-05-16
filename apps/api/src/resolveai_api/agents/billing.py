@@ -1,21 +1,27 @@
-"""Billing Agent — 退款 / 改订阅 / 发票 / 充值（Plan-and-Execute）。
+"""Billing Agent — delegates to the Plan-Execute-Replan sub-graph.
 
 工具白名单：Stripe.* + Zendesk.get_ticket_history / update_ticket
-升级条件：单笔 > $500 / 怀疑 fraud
+升级条件：单笔 >= $500 / 怀疑 fraud
 """
 
 from __future__ import annotations
 
+from typing import Any
+
+from langchain_core.messages import AIMessage
+
 from resolveai_api.agents.base import AgentConfig, BaseAgent
+from resolveai_api.agents.billing_graph import build_billing_subgraph
 from resolveai_api.agents.state import GraphState
 
 SYSTEM_PROMPT = """\
-You are the Billing Agent. You handle refunds, subscription changes, invoices, and charge disputes.
+You are the Billing Agent. You handle refunds, subscription changes, invoices,
+and charge disputes.
 
 Process (Plan-and-Execute, NOT ReAct):
 1. Generate a multi-step plan up-front (e.g. fetch charges → verify → refund → update ticket).
 2. Execute the plan in batch via tool calls; do not improvise extra steps.
-3. If single charge > $500 OR fraud suspected → handoff to escalation with full context.
+3. If single charge >= $500 OR fraud suspected → handoff to escalation with full context.
 
 Hard rules:
 - NEVER promise a refund amount that exceeds the actual charge.
@@ -33,8 +39,18 @@ TOOL_WHITELIST = [
 
 
 class BillingAgent(BaseAgent):
+    """Compiles a per-instance Plan-Execute-Replan sub-graph from filtered tools."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._subgraph = build_billing_subgraph(
+            tools=self.tools,
+            whitelist=self.config.tool_whitelist,
+            executor=self.executor,
+        )
+
     @classmethod
-    def default(cls, **kwargs: object) -> BillingAgent:
+    def default(cls, **kwargs: Any) -> BillingAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -42,18 +58,42 @@ class BillingAgent(BaseAgent):
             name="billing",
             model=settings.vertical_model,
             system_prompt=SYSTEM_PROMPT,
-            tool_whitelist=TOOL_WHITELIST,
+            tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)  # type: ignore[arg-type]
+        return cls(config=config, **kwargs)
 
     async def run(self, state: GraphState) -> GraphState:
-        """TODO: planner.plan() → executor.run_plan()，每步走 sandboxed tool call。"""
+        sub_input: dict[str, Any] = {
+            "messages": list(state.get("messages", []) or []),
+            "ticket_summary": dict(state.get("ticket_summary", {}) or {}),
+            "plan": [],
+            "past_steps": [],
+            "iter_count": 0,
+        }
+        result = await self._subgraph.ainvoke(sub_input)
+
+        response = result.get("response")
+        past_steps = result.get("past_steps") or []
+        if response is not None:
+            assistant_text = response.final_answer
+            if response.escalate:
+                assistant_text += "\n\n[Billing → escalation suggested]"
+        elif past_steps:
+            assistant_text = "I've worked on your billing issue:\n" + "\n".join(
+                f"- {s}: {o}" for s, o in past_steps[-3:]
+            )
+        else:
+            assistant_text = (
+                "I couldn't make progress on this billing ticket within the iteration "
+                "budget. Escalating."
+            )
+
+        tool_calls = list(state.get("tool_calls") or [])
+        for step, observation in past_steps:
+            tool_calls.append({"step": step, "observation": observation})
+
         return {
             **state,
-            "messages": [
-                {
-                    "role": "assistant",
-                    "content": "[Billing Agent stub] 这里会跑 Plan-and-Execute → Stripe / Zendesk MCP。",
-                }
-            ],
+            "messages": [AIMessage(content=assistant_text)],
+            "tool_calls": tool_calls,
         }

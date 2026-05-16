@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from resolveai_api.agents.supervisor import SupervisorGraph, get_supervisor
+from resolveai_api.agents.supervisor import SupervisorGraph
+from resolveai_api.api.dependencies import get_supervisor
 
 router = APIRouter(tags=["chat"])
 

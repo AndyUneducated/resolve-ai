@@ -17,18 +17,33 @@ class Settings(BaseSettings):
     )
 
     # ---------- LLM ----------
+    llm_backend: str = Field(default="ollama", alias="LLM_BACKEND")
+    """ollama (default) | anthropic — switch via env without code changes."""
+    ollama_base_url: str = Field(
+        default="http://127.0.0.1:11434", alias="OLLAMA_BASE_URL"
+    )
+
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
 
-    # 决策 1 · Cost-aware Routing
-    triage_model: str = Field(default="claude-3-5-haiku-latest", alias="TRIAGE_MODEL")
-    vertical_model: str = Field(default="claude-3-5-sonnet-latest", alias="VERTICAL_MODEL")
+    # 决策 1 · Cost-aware Routing（本地验证默认双 7B；生产可设 VERTICAL_MODEL=qwen2.5:32b）
+    triage_model: str = Field(default="qwen2.5:7b", alias="TRIAGE_MODEL")
+    vertical_model: str = Field(default="qwen2.5:7b", alias="VERTICAL_MODEL")
 
     # ---------- DB ----------
     database_url: str = Field(
         default="postgresql+psycopg://resolveai:resolveai@localhost:5432/resolveai",
         alias="DATABASE_URL",
     )
+
+    # ---------- Checkpointer ----------
+    checkpoint_backend: str = Field(default="postgres", alias="CHECKPOINT_BACKEND")
+    """postgres (default) | memory — memory used in tests, postgres in dev/prod."""
+
+    @property
+    def psycopg_dsn(self) -> str:
+        """LangGraph AsyncPostgresSaver wants raw psycopg DSN, not SQLAlchemy URL."""
+        return self.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
 
     # ---------- API ----------
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
@@ -38,15 +53,13 @@ class Settings(BaseSettings):
 
     # ---------- MCP ----------
     mcp_transport: str = Field(default="stdio", alias="MCP_TRANSPORT")
-    mcp_zendesk_cmd: str = Field(default="python -m mcp_servers.zendesk", alias="MCP_ZENDESK_CMD")
     mcp_stripe_cmd: str = Field(default="python -m mcp_servers.stripe", alias="MCP_STRIPE_CMD")
-    mcp_slack_cmd: str = Field(default="python -m mcp_servers.slack", alias="MCP_SLACK_CMD")
-    mcp_salesforce_cmd: str = Field(
-        default="python -m mcp_servers.salesforce", alias="MCP_SALESFORCE_CMD"
-    )
-    mcp_intercom_cmd: str = Field(
-        default="python -m mcp_servers.intercom", alias="MCP_INTERCOM_CMD"
-    )
+    # The remaining 4 servers ship as TOOLS-only stubs in M2; their stdio impl
+    # lands in M3. Setting any of these to a real cmd auto-enables them.
+    mcp_zendesk_cmd: str = Field(default="", alias="MCP_ZENDESK_CMD")
+    mcp_slack_cmd: str = Field(default="", alias="MCP_SLACK_CMD")
+    mcp_salesforce_cmd: str = Field(default="", alias="MCP_SALESFORCE_CMD")
+    mcp_intercom_cmd: str = Field(default="", alias="MCP_INTERCOM_CMD")
 
     # ---------- Guardrails ----------
     llama_guard_endpoint: str = Field(default="", alias="LLAMA_GUARD_ENDPOINT")

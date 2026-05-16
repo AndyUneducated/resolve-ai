@@ -13,10 +13,26 @@ export default function Home() {
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <Card title="Triage Agent" desc="意图分类 + 路由 (走 Haiku)" />
-        <Card title="Billing Agent" desc="退款 / 改订阅 (Plan-and-Execute)" />
-        <Card title="Technical Agent" desc="bug / 配置帮助 (Hybrid retrieval)" />
-        <Card title="Escalation Agent" desc="转人工 + Slack notify" />
+        <Card
+          href="/chat?preset=triage"
+          title="Triage Agent"
+          desc="意图分类 + 路由 (走 Haiku)"
+        />
+        <Card
+          href="/chat?preset=billing"
+          title="Billing Agent"
+          desc="退款 / 改订阅 (Plan-and-Execute)"
+        />
+        <Card
+          href="/chat?preset=technical"
+          title="Technical Agent"
+          desc="bug / 配置帮助 (Hybrid retrieval)"
+        />
+        <Card
+          href="/chat?preset=escalation"
+          title="Escalation Agent"
+          desc="转人工 + Slack notify"
+        />
       </section>
 
       <section className="rounded-lg border border-border bg-muted/40 p-6">
@@ -37,11 +53,15 @@ export default function Home() {
   );
 }
 
-function Card({ title, desc }: { title: string; desc: string }) {
+function Card({ href, title, desc }: { href: string; title: string; desc: string }) {
   return (
-    <div className="rounded-lg border border-border p-4 transition hover:border-foreground/30">
+    <Link
+      href={href}
+      className="block rounded-lg border border-border p-4 transition hover:border-foreground/30 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
+    >
       <div className="text-sm font-medium">{title}</div>
       <div className="mt-1 text-xs text-foreground/60">{desc}</div>
-    </div>
+      <div className="mt-3 text-xs text-foreground/40">点击进入聊天（预填示例）→</div>
+    </Link>
   );
 }

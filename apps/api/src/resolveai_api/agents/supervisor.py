@@ -1,54 +1,61 @@
-"""Supervisor — LangGraph 编排，跑 Triage → 业务 Agent → (可选) Escalation。
+"""Supervisor — LangGraph orchestration: Triage → vertical agent → END.
 
-State checkpointing key = (tenant_id, customer_id, thread_id)，
-对应决策 4 · Layer 4 记忆侧隔离。
+Compile-time wiring:
+- `checkpointer` (AsyncPostgresSaver | MemorySaver) for stateful handoff & resume.
+- `mcp_tools` (already capability-annotated by `mcp/loader.py`) filtered per-Agent.
+
+Per-request:
+- `thread_id = "{tenant}::{customer}::{thread}"` is namespaced for cross-tenant
+  isolation (decision 4 · Layer 4).
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from functools import lru_cache
 from typing import Literal
 
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.tools import BaseTool
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
+from resolveai_api.agents.billing import TOOL_WHITELIST as BILLING_WHITELIST
 from resolveai_api.agents.billing import BillingAgent
+from resolveai_api.agents.escalation import TOOL_WHITELIST as ESCALATION_WHITELIST
 from resolveai_api.agents.escalation import EscalationAgent
 from resolveai_api.agents.state import GraphState
+from resolveai_api.agents.technical import TOOL_WHITELIST as TECHNICAL_WHITELIST
 from resolveai_api.agents.technical import TechnicalAgent
 from resolveai_api.agents.triage import TriageAgent
 from resolveai_api.config import get_settings
 from resolveai_api.core.executor import Executor
-from resolveai_api.core.memory import Memory
-from resolveai_api.core.planner import Planner
-from resolveai_api.core.tool import ToolBelt
 from resolveai_api.guardrails.input_filter import InputGuardrail
+from resolveai_api.guardrails.memory_isolator import MemoryIsolator
 from resolveai_api.guardrails.output_filter import OutputGuardrail
+from resolveai_api.mcp.loader import filter_by_whitelist
 
 
-def _build_agents() -> dict[str, object]:
-    """工厂 — 用同一套四件套实现，注入到每个 Agent。"""
-    planner = Planner()
-    memory = Memory()
-    toolbelt = ToolBelt()
+def _build_agents(mcp_tools: list[BaseTool]) -> dict[str, object]:
     executor = Executor()
-    common = {
-        "planner": planner,
-        "memory": memory,
-        "toolbelt": toolbelt,
-        "executor": executor,
-    }
     return {
-        "triage": TriageAgent.default(**common),
-        "billing": BillingAgent.default(**common),
-        "technical": TechnicalAgent.default(**common),
-        "escalation": EscalationAgent.default(**common),
+        "triage": TriageAgent.default(tools=[], executor=executor),
+        "billing": BillingAgent.default(
+            tools=filter_by_whitelist(mcp_tools, BILLING_WHITELIST),
+            executor=executor,
+        ),
+        "technical": TechnicalAgent.default(
+            tools=filter_by_whitelist(mcp_tools, TECHNICAL_WHITELIST),
+            executor=executor,
+        ),
+        "escalation": EscalationAgent.default(
+            tools=filter_by_whitelist(mcp_tools, ESCALATION_WHITELIST),
+            executor=executor,
+        ),
     }
 
 
 def _route_after_triage(state: GraphState) -> Literal["billing", "technical", "escalation", END]:
-    """Conditional edge — 按 Triage 输出的 intent 走分支。"""
     summary = state.get("ticket_summary", {})
     intent = summary.get("intent", "other")
     if intent in ("billing", "technical", "escalation"):
@@ -56,11 +63,29 @@ def _route_after_triage(state: GraphState) -> Literal["billing", "technical", "e
     return END
 
 
-class SupervisorGraph:
-    """对外暴露的 stream() — 把 LangGraph 事件转换成 SSE event。"""
+def _extract_text(msg: BaseMessage | dict | object) -> str:
+    if isinstance(msg, BaseMessage):
+        content = msg.content
+    elif isinstance(msg, dict):
+        content = msg.get("content", "")
+    else:
+        content = ""
+    if isinstance(content, str):
+        return content
+    return str(content)
 
-    def __init__(self) -> None:
-        self.agents = _build_agents()
+
+class SupervisorGraph:
+    """LangGraph supervisor wired with checkpointer + MCP tools."""
+
+    def __init__(
+        self,
+        *,
+        checkpointer: BaseCheckpointSaver,
+        mcp_tools: list[BaseTool] | None = None,
+    ) -> None:
+        self.checkpointer = checkpointer
+        self.agents = _build_agents(mcp_tools or [])
         self.input_guard = InputGuardrail()
         self.output_guard = OutputGuardrail()
         self.graph = self._build_graph()
@@ -88,8 +113,7 @@ class SupervisorGraph:
         builder.add_edge("technical", END)
         builder.add_edge("escalation", END)
 
-        # TODO: 接 PostgresSaver 做 checkpointing（决策 4 · Layer 4）
-        return builder.compile()
+        return builder.compile(checkpointer=self.checkpointer)
 
     async def stream(
         self,
@@ -101,39 +125,39 @@ class SupervisorGraph:
     ) -> AsyncIterator[dict[str, str]]:
         settings = get_settings()
         tenant_id = tenant_id or settings.default_tenant_id
+        thread_id = thread_id or "default"
+        namespace = MemoryIsolator.namespace(tenant_id, customer_id, thread_id)
 
-        # ---- 决策 4 · Layer 1 输入 guardrails ----
+        # Layer 1 input guardrails
         scrubbed, flags = await self.input_guard.scan_and_redact(message)
         if "blocked" in flags:
             yield {"type": "blocked", "data": json.dumps({"reason": flags})}
             return
 
         initial: GraphState = {
-            "messages": [{"role": "user", "content": scrubbed}],
+            "messages": [HumanMessage(content=scrubbed)],
             "tenant_id": tenant_id,
             "customer_id": customer_id,
-            "thread_id": thread_id or "",
+            "thread_id": thread_id,
             "tool_calls": [],
             "guardrail_flags": flags,
         }
+        config = {"configurable": {"thread_id": namespace}}
 
-        async for event in self.graph.astream(initial):
+        async for event in self.graph.astream(initial, config=config):
             for node_name, node_state in event.items():
-                # ---- 决策 4 · Layer 3 输出 guardrails ----
-                msgs = node_state.get("messages", []) if isinstance(node_state, dict) else []
-                if msgs:
-                    last = msgs[-1]
-                    content = last.get("content", "") if isinstance(last, dict) else ""
-                    safe, out_flags = await self.output_guard.scan(content)
-                    yield {
-                        "type": "agent_step",
-                        "data": json.dumps(
-                            {"agent": node_name, "content": safe, "flags": out_flags}
-                        ),
-                    }
+                msgs = (
+                    node_state.get("messages", []) if isinstance(node_state, dict) else []
+                )
+                if not msgs:
+                    continue
+                content = _extract_text(msgs[-1])
+                # Layer 3 output guardrails
+                safe, out_flags = await self.output_guard.scan(content)
+                yield {
+                    "type": "agent_step",
+                    "data": json.dumps(
+                        {"agent": node_name, "content": safe, "flags": out_flags}
+                    ),
+                }
         yield {"type": "done", "data": "{}"}
-
-
-@lru_cache
-def get_supervisor() -> SupervisorGraph:
-    return SupervisorGraph()

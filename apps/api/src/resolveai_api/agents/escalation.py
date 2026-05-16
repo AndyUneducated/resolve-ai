@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from langchain_core.messages import AIMessage
+
 from resolveai_api.agents.base import AgentConfig, BaseAgent
 from resolveai_api.agents.state import GraphState
 
@@ -32,7 +36,7 @@ TOOL_WHITELIST = [
 
 class EscalationAgent(BaseAgent):
     @classmethod
-    def default(cls, **kwargs: object) -> EscalationAgent:
+    def default(cls, **kwargs: Any) -> EscalationAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -40,18 +44,17 @@ class EscalationAgent(BaseAgent):
             name="escalation",
             model=settings.vertical_model,
             system_prompt=SYSTEM_PROMPT,
-            tool_whitelist=TOOL_WHITELIST,
+            tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)  # type: ignore[arg-type]
+        return cls(config=config, **kwargs)
 
     async def run(self, state: GraphState) -> GraphState:
-        """TODO: 拼 handoff packet → Slack + Zendesk。"""
+        """TODO (M3): wire Slack + Zendesk MCP servers and emit handoff packet."""
         return {
             **state,
             "messages": [
-                {
-                    "role": "assistant",
-                    "content": "[Escalation Agent stub] 已通知人工客服，附完整 trace。",
-                }
+                AIMessage(
+                    content="[Escalation Agent stub] human handoff lands in M3 once Slack/Zendesk MCP are real."
+                )
             ],
         }

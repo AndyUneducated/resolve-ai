@@ -18,12 +18,14 @@ class McpServerSpec:
 
 
 def default_servers() -> list[McpServerSpec]:
+    """Return only servers with a non-empty cmd (stub servers are skipped in M2)."""
     s = get_settings()
     transport = s.mcp_transport
-    return [
-        McpServerSpec("zendesk", s.mcp_zendesk_cmd, transport),
-        McpServerSpec("stripe", s.mcp_stripe_cmd, transport),
-        McpServerSpec("slack", s.mcp_slack_cmd, transport),
-        McpServerSpec("salesforce", s.mcp_salesforce_cmd, transport),
-        McpServerSpec("intercom", s.mcp_intercom_cmd, transport),
+    candidates = [
+        ("zendesk", s.mcp_zendesk_cmd),
+        ("stripe", s.mcp_stripe_cmd),
+        ("slack", s.mcp_slack_cmd),
+        ("salesforce", s.mcp_salesforce_cmd),
+        ("intercom", s.mcp_intercom_cmd),
     ]
+    return [McpServerSpec(name, cmd, transport) for name, cmd in candidates if cmd]

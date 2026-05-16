@@ -8,17 +8,21 @@
 
 ## Milestone 1 · Hello-World 流通（1 day）🧱
 
-- [ ] `make install` 跑通（uv sync + npm install）
-- [ ] `make api` 起后端，`GET /` 200
-- [ ] `make web` 起前端，`/chat` 能发请求拿到 stub 响应
-- [ ] `make test` 通过
+- [x] `make install` 跑通（uv sync + npm install）
+- [x] `make api` 起后端，`GET /` 200
+- [x] `make web` 起前端，`/chat` 能发请求拿到 stub 响应
+- [x] `make test` 通过
 
-## Milestone 2 · 单 Agent 真跑（2-3 days）🧱
+## Milestone 2 · 单 Agent 真跑（2-3 days）🧱 — ✅ Done
 
-- [ ] `TriageAgent` 接 Anthropic Haiku，做意图分类
-- [ ] `BillingAgent` 接 Sonnet，跑 Plan-and-Execute
-- [ ] 1 个 MCP server（Stripe）真跑，`stripe.list_charges` / `refund` 可调
-- [ ] LangGraph PostgresSaver 接上，state 真持久化
+- [x] `TriageAgent` 接 **Ollama `qwen2.5:7b`**（`with_structured_output(TriageOutput)`，Pydantic v2 schema）
+- [x] `BillingAgent` 接 **Ollama**（`VERTICAL_MODEL`，默认本机验证用 `qwen2.5:7b`，可按需改 `qwen2.5:32b`），落地 LangGraph 官方 Plan-Execute-Replan 三节点闭环子图（`apps/api/src/resolveai_api/agents/billing_graph.py`）
+- [x] Stripe MCP server 用官方 `mcp.server.lowlevel.Server` + `stdio_server` 真跑；`list_charges` / `get_charge` / `refund` 全部可调，含 over-amount / already-refunded 错误路径
+- [x] LangGraph `AsyncPostgresSaver` 接上（`CHECKPOINT_BACKEND=postgres`），测试用 `MemorySaver`；thread_id = `tenant::customer::thread` 对齐决策 4 · Layer 4
+- [x] `langchain-mcp-adapters` 桥接 MCP → LangChain `BaseTool`，capability whitelist 在 Executor 强制（destructive 必须显式 grant）
+- [x] 21/21 单元 + e2e 测试绿，含 `test_triage_structured` / `test_billing_subgraph` / `test_stripe_mcp` / `test_capability_whitelist` / `test_chat_flow`（含 checkpoint 恢复）
+
+详细技术方案见 [`docs/milestone-2-plan.md`](milestone-2-plan.md)。
 
 ## Milestone 3 · 5 SaaS 全 MCP-ize（3 days）🧱
 

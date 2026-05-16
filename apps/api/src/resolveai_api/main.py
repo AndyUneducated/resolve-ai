@@ -1,24 +1,44 @@
-"""FastAPI 入口 — 装配中间件、路由、observability。"""
+"""FastAPI entry point — wires lifespan resources (checkpointer + MCP tools)."""
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import logging
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from resolveai_api.agents.supervisor import SupervisorGraph
 from resolveai_api.api import chat, health, tickets
 from resolveai_api.config import get_settings
+from resolveai_api.core.checkpointer import lifespan_checkpointer
+from resolveai_api.mcp.loader import build_client, load_tools
 from resolveai_api.observability.tracing import setup_tracing
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
     settings = get_settings()
     setup_tracing(app, service_name=settings.otel_service_name, endpoint=settings.otel_endpoint)
-    yield
-    # shutdown — 留给后续：关 MCP client / DB pool
+
+    async with AsyncExitStack() as stack:
+        checkpointer = await stack.enter_async_context(lifespan_checkpointer())
+
+        # Discover MCP tools eagerly — failures here should not block the API.
+        try:
+            client = build_client()
+            mcp_tools = await load_tools(client)
+            logger.info("loaded %d MCP tools", len(mcp_tools))
+        except Exception:  # pragma: no cover — defensive
+            logger.exception("MCP tool loading failed; serving with 0 tools")
+            mcp_tools = []
+
+        app.state.checkpointer = checkpointer
+        app.state.mcp_tools = mcp_tools
+        app.state.supervisor = SupervisorGraph(checkpointer=checkpointer, mcp_tools=mcp_tools)
+        yield
 
 
 def create_app() -> FastAPI:

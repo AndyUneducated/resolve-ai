@@ -22,7 +22,9 @@ dev:
 	@( $(MAKE) api & $(MAKE) web & wait )
 
 api:
-	uv run uvicorn resolveai_api.main:app --reload --host 0.0.0.0 --port 8000
+	# `python -m uvicorn` keeps --reload subprocess on the project interpreter;
+	# bare `uvicorn` can pick system site-packages when VIRTUAL_ENV/PATH is stale.
+	uv run python -m uvicorn resolveai_api.main:app --reload --host 0.0.0.0 --port 8000
 
 web:
 	cd apps/web && npm run dev
@@ -31,7 +33,7 @@ seed:
 	uv run python scripts/seed_db.py
 
 test:
-	uv run pytest -q
+	uv run python -m pytest -q
 	cd apps/web && npm run lint
 
 red-team:

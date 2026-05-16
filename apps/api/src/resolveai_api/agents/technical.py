@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from langchain_core.messages import AIMessage
+
 from resolveai_api.agents.base import AgentConfig, BaseAgent
 from resolveai_api.agents.state import GraphState
 
@@ -31,7 +35,7 @@ TOOL_WHITELIST = [
 
 class TechnicalAgent(BaseAgent):
     @classmethod
-    def default(cls, **kwargs: object) -> TechnicalAgent:
+    def default(cls, **kwargs: Any) -> TechnicalAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -39,18 +43,17 @@ class TechnicalAgent(BaseAgent):
             name="technical",
             model=settings.vertical_model,
             system_prompt=SYSTEM_PROMPT,
-            tool_whitelist=TOOL_WHITELIST,
+            tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)  # type: ignore[arg-type]
+        return cls(config=config, **kwargs)
 
     async def run(self, state: GraphState) -> GraphState:
-        """TODO: 接 hybrid retrieval + Plan-and-Execute。"""
+        """TODO (M6): hybrid retrieval + plan-and-execute via billing_graph."""
         return {
             **state,
             "messages": [
-                {
-                    "role": "assistant",
-                    "content": "[Technical Agent stub] 这里会先查 KB，再走多步 plan。",
-                }
+                AIMessage(
+                    content="[Technical Agent stub] KB lookup + multi-step plan lands in M6."
+                )
             ],
         }

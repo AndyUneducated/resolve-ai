@@ -19,9 +19,11 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-anthropic>=0.2",
     "langchain-openai>=0.2",
+    "langchain-ollama>=0.2",
 
     # MCP
     "mcp>=1.0",
+    "langchain-mcp-adapters>=0.1",
 
     # DB / Retrieval
     "sqlalchemy>=2.0",

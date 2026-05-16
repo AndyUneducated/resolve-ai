@@ -5,9 +5,15 @@ description = "Adversarially-Hardened Multi-Agent Customer Support — workspace
 readme = "README.md"
 requires-python = ">=3.11"
 
-# 顶层不直接发布，只是 workspace 容器；声明 API 成员以便根目录 `uv run pytest` 等能导入 resolveai_api
+# 顶层不直接发布，只是 workspace 容器；声明所有成员以便 `uv sync`（无需 --all-packages）
+# 自动把 API 与 5 个 MCP server 一起装进 .venv，方便 `python -m mcp_servers.stripe`。
 dependencies = [
     "resolveai-api",
+    "mcp-server-zendesk",
+    "mcp-server-stripe",
+    "mcp-server-slack",
+    "mcp-server-salesforce",
+    "mcp-server-intercom",
 ]
 
 [tool.uv.workspace]
@@ -22,6 +28,11 @@ members = [
 
 [tool.uv.sources]
 resolveai-api = { workspace = true }
+mcp-server-zendesk = { workspace = true }
+mcp-server-stripe = { workspace = true }
+mcp-server-slack = { workspace = true }
+mcp-server-salesforce = { workspace = true }
+mcp-server-intercom = { workspace = true }
 
 [dependency-groups]
 dev = [

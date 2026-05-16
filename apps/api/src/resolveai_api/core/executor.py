@@ -1,53 +1,74 @@
-"""Executor — 把 Plan 在 sandbox 里跑起来。
+"""Executor — invoke LangChain tools (MCP-backed) with capability enforcement.
 
 每次工具调用都过：
   1. capability whitelist 检查（决策 4 · Layer 2）
-  2. gVisor sandbox 执行（决策 4 · Layer 2）
-  3. 工具返回值 schema 校验（防 LLM 编造的 hallucinated entity 漏出来）
+     - destructive 工具必须在 agent 的 whitelist 中
+     - read 工具默认放行（即使不在白名单）— 业务 Agent 通常需要读
+  2. gVisor sandbox scope（决策 4 · Layer 2 · placeholder until M4）
+  3. 调用 LangChain BaseTool（由 mcp/loader.py 适配出来）
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
-from resolveai_api.core.tool import ToolBelt
+from langchain_core.tools import BaseTool
+
 from resolveai_api.guardrails.exec_sandbox import ExecutionSandbox
 
 
 @dataclass
 class ExecutionResult:
     tool: str
-    args: dict[str, object]
+    args: dict[str, Any]
     output: object
     duration_ms: float
-    sandbox_violations: list[str]
+    sandbox_violations: list[str] = field(default_factory=list)
 
 
 class Executor:
-    def __init__(
-        self,
-        toolbelt: ToolBelt | None = None,
-        sandbox: ExecutionSandbox | None = None,
-    ) -> None:
-        self.toolbelt = toolbelt or ToolBelt()
+    """Wraps every tool call with capability + sandbox checks.
+
+    `tools` is the per-Agent whitelist as `list[BaseTool]` (already filtered by
+    [`mcp/loader.py`](../mcp/loader.py).filter_by_whitelist before being passed in).
+    """
+
+    def __init__(self, sandbox: ExecutionSandbox | None = None) -> None:
         self.sandbox = sandbox or ExecutionSandbox()
+
+    @staticmethod
+    def _full_name(tool: BaseTool) -> str:
+        meta = tool.metadata or {}
+        return str(meta.get("full_name") or tool.name)
+
+    @staticmethod
+    def _capability(tool: BaseTool) -> str:
+        return str((tool.metadata or {}).get("capability", "read"))
+
+    def _check_capability(self, tool: BaseTool, whitelist: list[str]) -> None:
+        capability = self._capability(tool)
+        full = self._full_name(tool)
+        if capability == "destructive" and full not in whitelist:
+            raise PermissionError(
+                f"Destructive tool {full!r} not granted (whitelist={whitelist!r})"
+            )
 
     async def call_tool(
         self,
         *,
-        full_name: str,
-        args: dict[str, object],
+        tool: BaseTool,
+        args: dict[str, Any],
         whitelist: list[str],
     ) -> ExecutionResult:
-        if not self.toolbelt.whitelisted_for(full_name, whitelist):
-            raise PermissionError(f"Tool {full_name} not in agent whitelist")
+        self._check_capability(tool, whitelist)
 
-        # gVisor per-call sandbox
-        async with self.sandbox.scope(tool=full_name) as scope:
-            output = await self.toolbelt.client.call(full_name=full_name, args=args)
+        full = self._full_name(tool)
+        async with self.sandbox.scope(tool=full) as scope:
+            output = await tool.ainvoke(args)
 
         return ExecutionResult(
-            tool=full_name,
+            tool=full,
             args=args,
             output=output,
             duration_ms=scope.duration_ms,
