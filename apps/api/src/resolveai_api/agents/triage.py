@@ -1,6 +1,6 @@
 """Triage Agent — intent classification with Pydantic-typed structured output.
 
-- Cost-aware routing: tier="triage" → small model (default `qwen2.5:7b`).
+- Cost-aware routing: tier="triage" → small model (default `qwen3.5:9b`).
 - Never calls tools; output is a `TriageOutput` Pydantic model that becomes a
   `TicketSummary` (structured handoff payload — decision 1).
 - Intent → conditional edge in `SupervisorGraph` (`billing | technical | escalation`).

@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
 
-    # 决策 1 · Cost-aware Routing（本地验证默认双 7B；生产可设 VERTICAL_MODEL=qwen2.5:32b）
-    triage_model: str = Field(default="qwen2.5:7b", alias="TRIAGE_MODEL")
-    vertical_model: str = Field(default="qwen2.5:7b", alias="VERTICAL_MODEL")
+    # 决策 1 · Cost-aware Routing（本地验证默认双 9B；生产可设 VERTICAL_MODEL=qwen3.6:27b）
+    triage_model: str = Field(default="qwen3.5:9b", alias="TRIAGE_MODEL")
+    vertical_model: str = Field(default="qwen3.5:9b", alias="VERTICAL_MODEL")
 
     # ---------- DB ----------
     database_url: str = Field(

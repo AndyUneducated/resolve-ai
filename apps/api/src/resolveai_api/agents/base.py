@@ -20,7 +20,7 @@ from resolveai_api.core.executor import Executor
 class AgentConfig:
     name: AgentName
     model: str
-    """Model identifier consumed by the LLM factory (e.g. 'qwen2.5:7b')."""
+    """Model identifier consumed by the LLM factory (e.g. 'qwen3.5:9b')."""
     system_prompt: str
     tool_whitelist: list[str] = field(default_factory=list)
     """决策 4 · Layer 2 — capability whitelist；每个 Agent 只看自己的子集。"""

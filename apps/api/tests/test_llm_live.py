@@ -3,7 +3,7 @@
 Run explicitly — not part of default CI:
     uv run python -m pytest apps/api/tests/test_llm_live.py -v
 
-Requires: `ollama serve` and models from .env (default qwen2.5:7b).
+Requires: `ollama serve` and models from .env (default qwen3.5:9b / qwen3.6:27b).
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def ollama_available() -> str:
         pytest.skip(f"Ollama not reachable at {base}: {exc}")
 
     names = {m["name"] for m in r.json().get("models", [])}
-    # Tags may be "qwen2.5:7b" or include digest suffixes on some installs.
+    # Tags may be "qwen3.5:9b" or include digest suffixes on some installs.
     settings = get_settings()
     for required in (settings.triage_model, settings.vertical_model):
         if not any(n == required or n.startswith(f"{required}:") for n in names):

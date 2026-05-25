@@ -1,10 +1,10 @@
 """LLM factory — cost-aware routing across local (Ollama) / cloud (Anthropic).
 
 决策 1 · Cost-aware Routing：
-- tier="triage"   → 小模型（默认 `qwen2.5:7b`），高频低复杂度（意图分类）
-- tier="vertical" → 垂直模型（默认 `qwen2.5:7b`，与本机验证对齐；生产可在 .env 设 `qwen2.5:32b`）
+- tier="triage"   → 小模型（默认 `qwen3.5:9b`），高频低复杂度（意图分类）
+- tier="vertical" → 垂直模型（默认 `qwen3.5:9b`，与本机验证对齐；生产可在 .env 设 `qwen3.6:27b`）
 
-行业对齐：`ChatOllama` 是 LangChain 官方推荐的本地 LLM 客户端；qwen2.5
+行业对齐：`ChatOllama` 是 LangChain 官方推荐的本地 LLM 客户端；Qwen3.5+
 全系列原生支持 OpenAI 风格 tool calling 与 JSON mode。
 """
 

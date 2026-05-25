@@ -24,7 +24,7 @@
 
 | Subsystem | Choice | Rationale |
 |-----------|--------|-----------|
-| LLM client | `langchain-ollama` `ChatOllama` | LangChain-supported local stack; Qwen 2.5 supports tool calling / JSON-style structured output |
+| LLM client | `langchain-ollama` `ChatOllama` | LangChain-supported local stack; Qwen 3.5+ supports tool calling / JSON-style structured output |
 | Triage I/O | Pydantic v2 + `with_structured_output(schema)` | LangChain 1.x pattern |
 | Plan / execute | Three-node subgraph + conditional edges to `END` | LangGraph “planning agents” pattern |
 | MCP bridge | `langchain-mcp-adapters` | Official adapter; avoids hand-rolled JSON-RPC |
