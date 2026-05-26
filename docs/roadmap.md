@@ -35,12 +35,12 @@
 
 详细技术方案见 [`docs/milestone-3-plan.md`](milestone-3-plan.md)。
 
-## Milestone 4 · 四层 Guardrails 真跑（2-3 days）🧱
+## Milestone 4 · 四层 Guardrails 真跑（2-3 days）🧱 — ✅ Done
 
-- [ ] 输入：Llama Guard endpoint + Presidio analyzer
-- [ ] 执行：gVisor runtime 跑工具调用（K8s Pod-per-call 或 docker --runtime=runsc）
-- [ ] 输出：Presidio re-scan + policy LLM judge + hallucinated entity detector（tool-return cross-check）
-- [ ] 记忆：state checkpoint key 强制 `(tenant_id, customer_id)` 命名空间，cross-tenant access 抛 PermissionError
+- [x] 输入：Llama Guard endpoint + Presidio analyzer
+- [x] 执行：gVisor runtime 跑工具调用（K8s Pod-per-call 或 docker --runtime=runsc）
+- [x] 输出：Presidio re-scan + policy LLM judge + hallucinated entity detector（tool-return cross-check）
+- [x] 记忆：state checkpoint key 强制 `(tenant_id, customer_id)` 命名空间，cross-tenant access 抛 PermissionError
 
 ## Milestone 5 · Adversarial Eval Harness（3-4 days）⭐
 

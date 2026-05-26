@@ -82,14 +82,23 @@ function ChatPageContent() {
         const { events, rest } = splitSseEvents(buffer);
         buffer = rest;
         for (const evt of events) {
+          const eventLine = evt.split("\n").find((l) => l.startsWith("event:"));
           const dataLine = evt.split("\n").find((l) => l.startsWith("data:"));
           if (!dataLine) continue;
+          const eventName = eventLine?.replace(/^event:\s*/, "").trim() ?? "";
           const jsonPart = dataLine.replace(/^data:\s*/, "").trim();
           if (!jsonPart) continue;
           try {
             const payload = JSON.parse(jsonPart) as Record<string, unknown>;
+            if (eventName === "blocked") {
+              const reason = Array.isArray(payload.reason)
+                ? (payload.reason as string[]).join(", ")
+                : String(payload.reason ?? "unknown reason");
+              setError(`Request blocked by safety policy: ${reason}`);
+              continue;
+            }
             const agent = payload.agent;
-            if (typeof agent === "string") {
+            if (eventName === "agent_step" && typeof agent === "string") {
               setSteps((prev) => [
                 ...prev,
                 {

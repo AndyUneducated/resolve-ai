@@ -17,21 +17,23 @@ from resolveai_api.config import get_settings
 @dataclass
 class SandboxScope:
     tool: str
+    mode: str
     started_at: float = field(default_factory=time.perf_counter)
     duration_ms: float = 0.0
     violations: list[str] = field(default_factory=list)
 
 
 class ExecutionSandbox:
-    """gVisor (runsc) per-call 沙箱。本地无 gVisor 时降级到能力白名单 + 网络出口限制。"""
+    """Execution scope metadata for sandboxed MCP tool calls."""
 
     def __init__(self) -> None:
-        self.runtime = get_settings().gvisor_runtime
+        settings = get_settings()
+        self.runtime = settings.gvisor_runtime
+        self.mode = str(getattr(settings, "sandbox_mode", "off")).strip().lower()
 
     @asynccontextmanager
     async def scope(self, *, tool: str):
-        scope = SandboxScope(tool=tool)
-        # TODO: 拉起 gVisor pod / docker --runtime=runsc 跑这次 tool call
+        scope = SandboxScope(tool=tool, mode=self.mode)
         try:
             yield scope
         finally:

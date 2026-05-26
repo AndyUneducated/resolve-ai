@@ -134,6 +134,9 @@ class SupervisorGraph:
         settings = get_settings()
         tenant_id = tenant_id or settings.default_tenant_id
         thread_id = thread_id or "default"
+        # Namespace is built from (tenant_id, customer_id, thread_id); the real
+        # cross-tenant defense lives in IsolatedCheckpointer (which compares the
+        # *stored* checkpoint namespace against the current request identity).
         namespace = MemoryIsolator.namespace(tenant_id, customer_id, thread_id)
 
         # Layer 1 input guardrails
@@ -150,7 +153,13 @@ class SupervisorGraph:
             "tool_calls": [],
             "guardrail_flags": flags,
         }
-        config = {"configurable": {"thread_id": namespace}}
+        config = {
+            "configurable": {
+                "thread_id": namespace,
+                "user_tenant_id": tenant_id,
+                "user_customer_id": customer_id,
+            }
+        }
 
         async for event in self.graph.astream(initial, config=config):
             for node_name, node_state in event.items():
@@ -161,7 +170,12 @@ class SupervisorGraph:
                     continue
                 content = _extract_text(msgs[-1])
                 # Layer 3 output guardrails
-                safe, out_flags = await self.output_guard.scan(content)
+                tool_calls = (
+                    node_state.get("tool_calls", [])
+                    if isinstance(node_state, dict)
+                    else []
+                )
+                safe, out_flags = await self.output_guard.scan(content, tool_calls)
                 yield {
                     "type": "agent_step",
                     "data": json.dumps(

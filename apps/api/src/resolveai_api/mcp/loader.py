@@ -16,6 +16,7 @@ from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.sessions import StdioConnection
 
+from resolveai_api.config import get_settings
 from resolveai_api.mcp.registry import McpServerSpec, default_servers
 
 if TYPE_CHECKING:
@@ -56,8 +57,33 @@ def _spec_to_connection(spec: McpServerSpec) -> StdioConnection:
     parts = shlex.split(spec.cmd)
     if not parts:
         raise ValueError(f"empty cmd for MCP server {spec.name!r}")
-    command, *args = parts
+    command, *args = _sandbox_wrap(parts)
     return StdioConnection(transport="stdio", command=command, args=args)
+
+
+def _sandbox_wrap(parts: list[str]) -> list[str]:
+    settings = get_settings()
+    mode = str(getattr(settings, "sandbox_mode", "off")).strip().lower()
+    if mode == "off":
+        return parts
+
+    image = str(getattr(settings, "mcp_sandbox_image", "resolveai/mcp-servers:dev"))
+    docker_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--pids-limit=64",
+        "--memory=512m",
+    ]
+    if mode == "gvisor":
+        docker_cmd.extend(["--runtime", settings.gvisor_runtime])
+    docker_cmd.append(image)
+    docker_cmd.extend(parts)
+    return docker_cmd
 
 
 def build_client(servers: list[McpServerSpec] | None = None) -> MultiServerMCPClient:

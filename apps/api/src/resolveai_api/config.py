@@ -60,11 +60,24 @@ class Settings(BaseSettings):
     mcp_slack_cmd: str = Field(default="", alias="MCP_SLACK_CMD")
     mcp_salesforce_cmd: str = Field(default="", alias="MCP_SALESFORCE_CMD")
     mcp_intercom_cmd: str = Field(default="", alias="MCP_INTERCOM_CMD")
+    sandbox_mode: str = Field(default="off", alias="SANDBOX_MODE")
+    mcp_sandbox_image: str = Field(
+        default="resolveai/mcp-servers:dev", alias="MCP_SANDBOX_IMAGE"
+    )
 
     # ---------- Guardrails ----------
     llama_guard_endpoint: str = Field(default="", alias="LLAMA_GUARD_ENDPOINT")
+    llama_guard_model: str = Field(default="llama-guard3:8b", alias="LLAMA_GUARD_MODEL")
+    llama_guard_timeout_ms: int = Field(default=2000, alias="LLAMA_GUARD_TIMEOUT_MS")
     presidio_endpoint: str = Field(default="", alias="PRESIDIO_ENDPOINT")
+    presidio_language: str = Field(default="en", alias="PRESIDIO_LANGUAGE")
+    policy_judge_model: str = Field(default="qwen3.5:9b", alias="POLICY_JUDGE_MODEL")
+    policy_judge_timeout_ms: int = Field(default=1500, alias="POLICY_JUDGE_TIMEOUT_MS")
     gvisor_runtime: str = Field(default="runsc", alias="GVISOR_RUNTIME")
+    guardrail_l1: str = Field(default="on", alias="GUARDRAIL_L1")
+    guardrail_l2: str = Field(default="on", alias="GUARDRAIL_L2")
+    guardrail_l3: str = Field(default="on", alias="GUARDRAIL_L3")
+    guardrail_l4: str = Field(default="on", alias="GUARDRAIL_L4")
 
     # ---------- Observability ----------
     otel_endpoint: str = Field(
