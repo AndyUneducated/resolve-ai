@@ -17,13 +17,10 @@ from typing import ClassVar
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from resolveai_api.config import get_settings
+from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.guardrails.presidio import get_presidio
 
 logger = logging.getLogger(__name__)
-
-
-def _flag_enabled(value: object) -> bool:
-    return str(value).strip().lower() in {"1", "true", "on", "yes"}
 
 
 @dataclass
@@ -77,7 +74,7 @@ class InputGuardrail:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._enabled = _flag_enabled(getattr(settings, "guardrail_l1", "on"))
+        self._enabled = flag_enabled(getattr(settings, "guardrail_l1", "on"))
         self._language = str(getattr(settings, "presidio_language", "en"))
         self._llama_guard_model = str(getattr(settings, "llama_guard_model", "llama-guard3:8b"))
         self._llama_guard_timeout_ms = int(getattr(settings, "llama_guard_timeout_ms", 2000))

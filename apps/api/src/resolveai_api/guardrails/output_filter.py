@@ -18,13 +18,10 @@ from pydantic import BaseModel, Field
 
 from resolveai_api.config import get_settings
 from resolveai_api.core.llm import make_structured_llm
+from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.guardrails.presidio import get_presidio
 
 logger = logging.getLogger(__name__)
-
-
-def _flag_enabled(value: object) -> bool:
-    return str(value).strip().lower() in {"1", "true", "on", "yes"}
 
 
 class PolicyVerdict(BaseModel):
@@ -83,7 +80,7 @@ class OutputGuardrail:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._enabled = _flag_enabled(getattr(settings, "guardrail_l3", "on"))
+        self._enabled = flag_enabled(getattr(settings, "guardrail_l3", "on"))
         self._language = str(getattr(settings, "presidio_language", "en"))
         self._judge = PolicyJudge(
             timeout_ms=int(getattr(settings, "policy_judge_timeout_ms", 1500))
@@ -122,9 +119,8 @@ class OutputGuardrail:
 
         # Run hallucinated-entity check on the *original* text — Presidio may
         # have redacted $ amounts or ids that we need for the cross-check.
-        flags.extend(
-            await self.verify_entities(text=text, tool_returns=tool_calls or [])
-        )
+        if tool_calls:
+            flags.extend(await self.verify_entities(text=text, tool_returns=tool_calls))
         return scrubbed, sorted(set(flags))
 
     async def verify_entities(

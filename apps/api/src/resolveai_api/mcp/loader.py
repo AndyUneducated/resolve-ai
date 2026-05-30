@@ -17,6 +17,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.sessions import StdioConnection
 
 from resolveai_api.config import get_settings
+from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.mcp.registry import McpServerSpec, default_servers
 
 if TYPE_CHECKING:
@@ -63,6 +64,8 @@ def _spec_to_connection(spec: McpServerSpec) -> StdioConnection:
 
 def _sandbox_wrap(parts: list[str]) -> list[str]:
     settings = get_settings()
+    if not flag_enabled(getattr(settings, "guardrail_l2", "on")):
+        return parts
     mode = str(getattr(settings, "sandbox_mode", "off")).strip().lower()
     if mode == "off":
         return parts

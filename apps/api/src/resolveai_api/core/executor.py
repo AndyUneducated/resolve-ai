@@ -5,7 +5,7 @@
      - read 工具默认放行（即使不在白名单）— 业务 Agent 通常需要读
      - write 工具必须显式 grant（agent 的 TOOL_WHITELIST）
      - destructive 工具必须显式 grant，并标 `audit=True` 供 Layer 3 cross-check
-  2. gVisor sandbox scope（决策 4 · Layer 2 · placeholder until M4）
+  2. sandbox scope metadata（决策 4 · Layer 2）
   3. 调用 LangChain BaseTool（由 mcp/loader.py 适配出来）
 
 行业对齐：capability-based access control 与 OpenAI tool calling / Anthropic

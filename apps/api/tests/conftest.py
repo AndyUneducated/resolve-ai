@@ -11,6 +11,7 @@ os.environ.setdefault("LLM_BACKEND", "ollama")
 os.environ.setdefault("DEFAULT_TENANT_ID", "demo")
 os.environ.setdefault("SANDBOX_MODE", "off")
 os.environ.setdefault("GUARDRAIL_L1", "off")
+os.environ.setdefault("GUARDRAIL_L2", "off")
 os.environ.setdefault("GUARDRAIL_L3", "off")
 os.environ.setdefault("GUARDRAIL_L4", "on")
 

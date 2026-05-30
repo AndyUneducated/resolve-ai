@@ -81,6 +81,7 @@ async def test_output_flags_hallucinated_entities(
 
 
 def test_loader_wraps_mcp_command_in_docker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GUARDRAIL_L2", "on")
     monkeypatch.setenv("SANDBOX_MODE", "docker")
     monkeypatch.setenv("MCP_SANDBOX_IMAGE", "resolveai/mcp-servers:test")
     get_settings.cache_clear()
@@ -92,6 +93,7 @@ def test_loader_wraps_mcp_command_in_docker_mode(monkeypatch: pytest.MonkeyPatch
 
 
 def test_loader_wraps_mcp_command_in_gvisor_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GUARDRAIL_L2", "on")
     monkeypatch.setenv("SANDBOX_MODE", "gvisor")
     monkeypatch.setenv("GVISOR_RUNTIME", "runsc")
     get_settings.cache_clear()
@@ -102,6 +104,7 @@ def test_loader_wraps_mcp_command_in_gvisor_mode(monkeypatch: pytest.MonkeyPatch
 
 
 def test_loader_keeps_stdio_when_sandbox_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GUARDRAIL_L2", "on")
     monkeypatch.setenv("SANDBOX_MODE", "off")
     get_settings.cache_clear()
     conn = _spec_to_connection(McpServerSpec(name="stripe", cmd="python -m mcp_servers.stripe"))

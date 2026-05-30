@@ -16,20 +16,27 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 
 from resolveai_api.config import get_settings
+from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.guardrails.memory_isolator import MemoryIsolator
+
+
+class CrossTenantAccessBlocked(PermissionError):
+    """Raised when checkpoint namespace does not match request identity."""
 
 
 class IsolatedCheckpointer(BaseCheckpointSaver):
     """Guard checkpoint access with tenant/customer namespace checks."""
 
-    def __init__(self, inner: BaseCheckpointSaver) -> None:
+    def __init__(self, inner: BaseCheckpointSaver, *, enabled: bool = True) -> None:
         # Inherit serde from the wrapped saver so downstream LangGraph code that
         # accesses self.serde (writes, versioning) keeps working unchanged.
         super().__init__(serde=getattr(inner, "serde", None))
         self._inner = inner
+        self._enabled = enabled
 
-    @staticmethod
-    def _assert_namespace(config: dict[str, Any] | None) -> None:
+    def _assert_namespace(self, config: dict[str, Any] | None) -> None:
+        if not self._enabled:
+            return
         if not config:
             return
         configurable = dict(config.get("configurable") or {})
@@ -37,9 +44,16 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
         tenant_id = str(configurable.get("user_tenant_id") or "")
         customer_id = str(configurable.get("user_customer_id") or "")
         if ns and tenant_id and customer_id:
-            MemoryIsolator.assert_match(ns=ns, tenant_id=tenant_id, customer_id=customer_id)
+            try:
+                MemoryIsolator.assert_match(
+                    ns=ns, tenant_id=tenant_id, customer_id=customer_id
+                )
+            except PermissionError as exc:
+                raise CrossTenantAccessBlocked(str(exc)) from exc
 
     def _assert_tuple_namespace(self, checkpoint_tuple: object, config: dict[str, Any]) -> None:
+        if not self._enabled:
+            return
         if checkpoint_tuple is None:
             return
         tuple_config = getattr(checkpoint_tuple, "config", None)
@@ -53,7 +67,12 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
         tenant_id = str(request_conf.get("user_tenant_id") or "")
         customer_id = str(request_conf.get("user_customer_id") or "")
         if tenant_id and customer_id:
-            MemoryIsolator.assert_match(ns=tuple_ns, tenant_id=tenant_id, customer_id=customer_id)
+            try:
+                MemoryIsolator.assert_match(
+                    ns=tuple_ns, tenant_id=tenant_id, customer_id=customer_id
+                )
+            except PermissionError as exc:
+                raise CrossTenantAccessBlocked(str(exc)) from exc
 
     def get_tuple(self, config: dict[str, Any]) -> Any:
         self._assert_namespace(config)
@@ -148,9 +167,10 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
 async def lifespan_checkpointer() -> AsyncIterator[BaseCheckpointSaver]:
     """Yield a checkpointer for the FastAPI lifespan; closes the pg conn on shutdown."""
     settings = get_settings()
+    l4_enabled = flag_enabled(getattr(settings, "guardrail_l4", "on"))
 
     if settings.checkpoint_backend == "memory":
-        yield IsolatedCheckpointer(MemorySaver())
+        yield IsolatedCheckpointer(MemorySaver(), enabled=l4_enabled)
         return
 
     if settings.checkpoint_backend != "postgres":
@@ -163,4 +183,4 @@ async def lifespan_checkpointer() -> AsyncIterator[BaseCheckpointSaver]:
 
     async with AsyncPostgresSaver.from_conn_string(settings.psycopg_dsn) as saver:
         await saver.setup()  # idempotent — creates checkpoint tables on first run
-        yield IsolatedCheckpointer(saver)
+        yield IsolatedCheckpointer(saver, enabled=l4_enabled)
