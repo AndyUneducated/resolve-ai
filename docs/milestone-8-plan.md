@@ -17,11 +17,30 @@
 | OTel spans | `observability/tracing.py` `get_tracer()/span()` no-op helper；`agents/supervisor.py` 中 `ticket.run` + `agent.{node}` + `guardrail.block` spans；`core/executor.py` 中 `tool.call` span |
 | EvalGate | `observability/evalgate.py` — `build_run_summary()`（tokens/cost/tool-error/latency from `RunTrace`）+ `EvalGateClient.push()`（httpx，未设 `EVALGATE_ENDPOINT` 即 no-op，吞 network errors） |
 | Regression gate | `scripts/regression_gate.py` — 在 `capture_run()` 下 score benchmark slice（复用 M7 judge/pricing/trace），push summaries 到 EvalGate，对比 `reports/baseline/metrics_baseline.json`，回归则非零 exit（CI 可用） |
-| Demo recorder | `apps/web/playwright.config.ts` + `apps/web/demo/record.spec.ts` — 驱动 4 beats，on-screen caption overlays，录制真实 `webm`；web app offline 时仍 resilient |
+| Demo recorder | `apps/web/playwright.config.ts` + `apps/web/demo/record.spec.ts` — 驱动 4 beats，屏幕字幕叠加，录制真实 `webm`；web app 离线时仍能正常出片 |
 | Demo artifacts | `scripts/render_metrics_page.py` — `metrics.html`（chaos P95 gauge + ablation table）与 `trace.html`（live guardrail/agent trace，含真实 cross-tenant `PermissionError`） |
 | Narration kit | `docs/demo/narration.md`（带时间戳 voiceover + captions）+ `docs/demo/shot-list.md`（run book） |
 | Make targets | `chaos`、`regression-gate`、`demo-assets`、`demo-record`、`obs` |
 | Tests | `apps/api/tests/test_m8.py`（13 tests） |
+
+三条交付各自的数据流：chaos 测吞吐、regression gate 守质量回归、recorder 产出 demo 视频。
+
+```mermaid
+flowchart LR
+  subgraph chaos["Chaos load（测吞吐）"]
+    gen["5000 mock tickets"] --> sem["asyncio.Semaphore<br/>并发 fan-out"]
+    sem --> graph1["真实 SupervisorGraph<br/>LLM_BACKEND=fake"]
+    graph1 --> rep["P50/P95/P99 + 报告<br/>P95 ≥ 6s → 非零 exit"]
+  end
+  subgraph gate["Regression gate（守质量）"]
+    slice["benchmark slice"] --> cap["capture_run()<br/>tokens / cost / latency / judge"]
+    cap --> sum["build_run_summary()"]
+    sum --> eg["EvalGate push（可选）"]
+    sum --> cmp{"对比 metrics_baseline.json"}
+    cmp -->|"回归超阈值"| fail["非零 exit（CI 拦）"]
+    cmp -->|正常| pass["通过"]
+  end
+```
 
 ---
 

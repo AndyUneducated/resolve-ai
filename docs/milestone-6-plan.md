@@ -12,6 +12,22 @@
 - Reranker → `sentence-transformers` CrossEncoder（可选 extra，graceful fallback）
 - DB access → SQLAlchemy async + psycopg（已在 deps 中）
 
+一次检索把 query 同时走两条召回路（lexical + dense），用 RRF 融合排名，再由 reranker 精排，最后交给 Technical Agent 做带 citation 的回答。两条召回路都强制按 `tenant_id` 过滤。
+
+```mermaid
+flowchart LR
+  q["查询 Query"] --> emb["Embedder · bge-m3"]
+  q --> lex["Lexical 召回<br/>Postgres ts_rank_cd (BM25)"]
+  emb --> dense["Dense 召回<br/>pgvector cosine"]
+  lex --> rrf["RRF 融合<br/>Reciprocal Rank Fusion (k=60)"]
+  dense --> rrf
+  rrf --> rerank["Reranker 精排<br/>bge-reranker-v2-m3<br/>(失败则降级为 RRF 顺序)"]
+  rerank --> guard["检索后 guardrail<br/>扫 KB poisoning / 注入"]
+  guard --> ans["Technical Agent<br/>grounded 回答 + citation"]
+  note["全程强制 WHERE tenant_id = :t"] -.-> lex
+  note -.-> dense
+```
+
 ---
 
 ## 1. 交付内容

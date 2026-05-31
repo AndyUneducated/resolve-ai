@@ -19,6 +19,20 @@
 | Scoring/report | `guardrails/eval_scoring.py` + `scripts/eval_report.py` 生成 Layer Attribution / Ablation / FP analysis（JSON + Markdown） |
 | Test coverage | 新增 `apps/api/tests/test_eval_harness.py`（scorer math 与 L4 ablation behavior） |
 
+整条 eval 管线：250 条标注 prompt 喂给 runner，runner 在多个 guardrail profile（全开 / 只开某层 / 关某层）下各跑一遍，每条记录「实际拦截层 vs 期望拦截层」，最后由 scorer 汇成三张表。
+
+```mermaid
+flowchart LR
+  ds["数据集 Dataset<br/>200 对抗 + 50 良性<br/>每条标 expected_block_layer"] --> runner
+  runner["eval_adversarial.py<br/>逐 profile 跑 SupervisorGraph"]
+  profiles["Profile 矩阵<br/>baseline · l1_only · l3_only · l4_only<br/>ablate_l1 · ablate_l3 · ablate_l4"] --> runner
+  runner --> raw["原始 JSONL<br/>每条：拦截层 / 是否 block / 输出"]
+  raw --> scorer["eval_scoring.py + eval_report.py"]
+  scorer --> t1["Layer Attribution 表"]
+  scorer --> t2["Ablation 表"]
+  scorer --> t3["False Positive 分析"]
+```
+
 ---
 
 ## 2. 关键文件变更

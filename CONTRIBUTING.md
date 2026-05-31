@@ -7,6 +7,20 @@
 - 扩充 [`scripts/red_team.py`](scripts/red_team.py) 里的 200 题对抗集。
 - 接入新的 LLM provider 或 routing 策略。
 
+## 提交流程一图
+
+```mermaid
+flowchart LR
+  setup["1 准备环境<br/>uv sync · npm install · seed"] --> dev["2 启动 dev<br/>make dev"]
+  dev --> code["改代码"]
+  code --> check["3 提交前自检<br/>make lint · typecheck · test · red-team"]
+  check -->|未过| code
+  check -->|全绿| pr["开 PR<br/>说明 为什么/改了什么/怎么测"]
+  pr --> ci{"CI：backend + frontend"}
+  ci -->|失败| code
+  ci -->|通过| merge["合并 Merge"]
+```
+
 ## 1. 准备本地环境
 
 ```bash
@@ -47,7 +61,7 @@ make red-team    # 200 个 adversarial prompt，期望 0 PII leak
 
 ## 4. 文档约定
 
-- **重要技术决策**写到 [`docs/design.md`](docs/design.md)，或新建 `DECISIONS.md`（ADR 风格）。
+- **重要技术决策**写到对应的 [`docs/milestone-*-plan.md`](.) 方案文档，或新建 `DECISIONS.md`（ADR 风格）。
 - **阶段性进展**更新 [`docs/roadmap.md`](docs/roadmap.md)。
 - **新增 MCP server**：在 [`packages/mcp-servers/<name>/README.md`](packages/mcp-servers/) 里写清 tool surface 与 capability 等级（read / write / destructive）。
 

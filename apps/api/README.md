@@ -2,6 +2,18 @@
 
 FastAPI + LangGraph 多 Agent 编排服务。
 
+## 请求如何流经各模块
+
+```mermaid
+flowchart LR
+  http["api/<br/>HTTP · SSE 路由"] --> sup["agents/<br/>Supervisor + 4 Agent"]
+  sup --> core["core/<br/>Planner · Memory · Tool · Executor"]
+  core --> mcp["mcp/<br/>MCP 工具协议"]
+  core --> ret["retrieval/<br/>Hybrid retrieval"]
+  gr["guardrails/<br/>四层 defense-in-depth"] -.->|"包裹 输入/输出/执行/记忆"| sup
+  obs["observability/<br/>OTel + EvalGate"] -.->|trace| sup
+```
+
 ## 模块对照
 
 | 目录 | 设计文档章节 |

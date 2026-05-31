@@ -16,7 +16,7 @@
 | Capability policy | **read / write / destructive**，后两者 default-deny | 对齐 OpenAI tool calling + Anthropic computer-use guidance + Bedrock Agents IAM model |
 | Mock servers | Stripe-template（`server.py` + `data.py` + `reset_store()`） | Deterministic；与未来 real adapter 契约相同 |
 
-两行 elevator pitch：
+一句话概括：
 
 > *Agents 接触的每个 SaaS 都经 MCP 到达；API 在 startup 时 discovery tools，标注 `(server, capability, full_name)`，Executor 拒绝任何 agent 未显式 grant 的 `write` 或 `destructive` 调用。*
 
@@ -102,6 +102,30 @@ app.state.supervisor = SupervisorGraph(checkpointer=checkpointer, toolbelt=toolb
 ```
 
 `SupervisorGraph._build_agents()` 从 `filter_by_whitelist(mcp_tools, …)` 切换为 `toolbelt.for_agent(WHITELIST)`。Agent 代码不再引用 `loader.py`。
+
+工具从「5 个 MCP server」到「Agent 能调用的那几个」要经过三步：startup 时发现并标注，按 Agent 白名单切片，最后由 Executor 在每次调用时按 capability 把关。
+
+```mermaid
+flowchart TD
+  subgraph servers["5 个 MCP server（stdio）"]
+    z[Zendesk]
+    st[Stripe]
+    sl[Slack]
+    sf[Salesforce]
+    ic[Intercom]
+  end
+  servers -->|"startup discovery"| belt["ToolBelt<br/>标注 (server, capability, full_name)"]
+  belt -->|"for_agent(whitelist)"| billing["Billing Agent<br/>工具子集"]
+  belt -->|"for_agent(whitelist)"| tech["Technical Agent<br/>工具子集"]
+  belt -->|"for_agent(whitelist)"| esc["Escalation Agent<br/>工具子集"]
+  billing --> exec
+  tech --> exec
+  esc --> exec
+  exec{"Executor capability 关卡"}
+  exec -->|"read → 放行"| ok["执行工具调用"]
+  exec -->|"write / destructive<br/>未 grant → 拒绝"| deny["PermissionError"]
+  exec -->|"destructive → audit log"| ok
+```
 
 ---
 

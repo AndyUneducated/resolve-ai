@@ -20,7 +20,25 @@
 | **D** | 4 agents | structured | Plan-Execute | triage | 已 ship 的 baseline |
 | **D_triage_vertical** | 4 agents | structured | Plan-Execute | **vertical** | Cost-routing micro-ablation |
 
-Runs **直接调用** compiled LangGraph（**无 guardrail wrapper**），数字反映 agent architecture，而非恒定（M5 负责）的 guardrail layer —  notably vertical-tier policy judge。
+Runs **直接调用** compiled LangGraph（**无 guardrail wrapper**），数字反映 agent architecture，而非恒定（M5 负责）的 guardrail layer —— 尤其是 vertical-tier 的 policy judge。
+
+四个 variant 其实是同一个 `VariantSpec` 在四条轴上的不同取值：拓扑、handoff 方式、业务策略、triage 用哪档模型。每个 variant 对同一份 120-ticket benchmark 跑一遍，真实 token / 工具调用经 trace 捕获，再由 judge 评是否真解决、由 pricing 折算成本，最后汇成 Ablation Table。
+
+```mermaid
+flowchart TD
+  subgraph axes["VariantSpec 四轴"]
+    a1["Topology<br/>single / 4-agent"]
+    a2["Handoff<br/>full / structured"]
+    a3["Strategy<br/>ReAct / Plan-Execute"]
+    a4["Triage tier<br/>cheap / vertical"]
+  end
+  axes --> build["build_variant() → A / B / C / D"]
+  bench["120-ticket benchmark<br/>带 ground-truth + rubric"] --> run
+  build --> run["eval_architecture.py<br/>variant × ticket 循环"]
+  run --> trace["RunTrace 捕获<br/>真实 token by tier + 工具调用"]
+  trace --> judge["judge 评 auto-resolve<br/>pricing 折算 $/ticket<br/>trace 分类 tool error"]
+  judge --> tbl["Architecture Ablation Table<br/>+ Δ(D vs A) + cost-routing + failure modes"]
+```
 
 ---
 
@@ -36,7 +54,7 @@ Runs **直接调用** compiled LangGraph（**无 guardrail wrapper**），数字
 | Scoring + report | `eval/arch_scoring.py` — per-variant aggregates（tokens、$/ticket、P50/P95、auto-resolve、tool-error）、Ablation Table + `Δ (D vs A)`、cost-routing table、failure-mode report；`render_markdown()` |
 | Runner | `scripts/eval_architecture.py` — variant×ticket loop → `reports/arch_eval_<ts>.{jsonl,json,md}`；graceful per-ticket timeout/error handling |
 | Benchmark | `apps/api/tests/fixtures/benchmark_tickets.jsonl` — 120 条手写 ticket（72 billing / 36 technical / 12 escalation），ground-truth `expected_intent` / `expected_resolution_path` / `expected_tool_calls` + `rubric`，对齐 MCP mock seed entities |
-| Blog draft | `docs/blog/multi-agent-tradeoffs.md` |
+| Blog draft | 已内联进 README「Benchmark & 对抗研究」章节 |
 | Tests | `apps/api/tests/test_arch_eval.py`（17 tests） |
 
 ---
@@ -52,7 +70,7 @@ Runs **直接调用** compiled LangGraph（**无 guardrail wrapper**），数字
 - Triage tier override + handoff plumbing：`agents/triage.py`、`agents/technical.py`、`agents/escalation.py`
 - Runner：`scripts/eval_architecture.py`
 - Benchmark + tests：`apps/api/tests/fixtures/benchmark_tickets.jsonl`、`apps/api/tests/test_arch_eval.py`
-- Docs：`docs/blog/multi-agent-tradeoffs.md`、`docs/roadmap.md`
+- Docs：README「Benchmark & 对抗研究」章节、`docs/roadmap.md`
 
 ---
 
@@ -80,7 +98,7 @@ uv run python scripts/eval_architecture.py --variants A,B,C,D --cost-routing
 uv run python scripts/eval_architecture.py --variants D --quick --case-timeout 240
 ```
 
-输出落在 `reports/arch_eval_<ts>.{jsonl,json,md}`；将 `.md` Ablation Table 粘贴进 `docs/blog/multi-agent-tradeoffs.md`。
+输出落在 `reports/arch_eval_<ts>.{jsonl,json,md}`；将 `.md` Ablation Table 粘贴进 README「Benchmark & 对抗研究」章节。
 
 > Technical grounded answers 的 prereqs：先 seed KB（`uv run python scripts/seed_db.py --truncate`），Technical Agent 才能 retrieve 真实 docs 而非降级 escalation。Runner 自动启用全部 5 个 MCP server，并使用 `CHECKPOINT_BACKEND=memory`。
 
@@ -107,7 +125,7 @@ uv run python scripts/eval_architecture.py --variants D --quick --case-timeout 2
 
 ## 7. 诚实 caveat
 
-- **Headline numbers 待全量 run 后填入。** 本地 9B Ollama 上单条 billing Plan-Execute ticket 可超 200s，故 A/B/C/D 表 intentionally 留 `TBD`（对齐 blog-1 惯例），而非 fabricated。在目标 hardware/model 上跑 harness 后粘贴生成的 `.md`。
+- **关键数字待全量 run 后填入。** 本地 9B Ollama 上单条 billing Plan-Execute ticket 可超 200s，故 A/B/C/D 表刻意留 `TBD`（对齐 blog-1 惯例），而非编造。在目标 hardware/model 上跑 harness 后粘贴生成的 `.md`。
 - **Variant C 主要影响 billing。** Technical Agent 已是固定 3-phase pipeline（非 Plan-Execute），ReAct ablation 对 billing 有意义；blog 中说明，不隐藏。
 - **Single-agent（A）无 KB tool。** `kb.search` 是 in-process（非 MCP tool），variant A 见 12 个 SaaS tools 但无 KB grounding — single-agent 设计的 realistic disadvantage，failure-mode write-up 中注明。
 - `core/checkpointer.py` 中一条 pre-existing ruff warning 与本 milestone 无关，未动。

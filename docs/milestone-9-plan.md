@@ -10,6 +10,21 @@
 
 > **定位（重要）：** 不做鉴权，意味着 RLS 的价值是 **defense-in-depth 防"应用代码 bug"**（某条 SQL 漏了 `WHERE tenant_id`），**而非防"恶意客户端"**（无 auth 时客户端仍自报 tenant）。这是诚实且站得住的 senior 叙事——别把它说成"拦住恶意租户"。
 
+每个请求把 tenant_id 注入到事务级变量 `app.tenant_id`，Postgres 的 RLS policy 据此自动过滤行。关键前提：必须以**低权限角色** `resolveai_app` 连库，否则超级用户会绕过 RLS（见 §7 决策 A）。
+
+```mermaid
+flowchart TD
+  req["请求 Request"] --> dep["get_tenant_id 依赖<br/>(demo 回退 DEFAULT_TENANT_ID)"]
+  dep --> sess["tenant_session(engine, tenant_id)"]
+  sess --> setc["事务内 SET LOCAL<br/>set_config('app.tenant_id', :t, true)"]
+  setc --> q["KbStore 查询（无显式 WHERE tenant_id）"]
+  q --> rls{"Postgres RLS policy"}
+  rls -->|"读：USING (tenant_id = app.tenant_id)"| rows["只返回本租户行"]
+  rls -->|"写：WITH CHECK 不匹配"| reject["拒绝写他租户行"]
+  rls -->|"未 set context → NULL → 0 行"| closed["默认拒绝 fail-closed"]
+  role["⚠ 必须以 resolveai_app<br/>(NOSUPERUSER NOBYPASSRLS) 连库"] -.-> rls
+```
+
 ---
 
 ## 1. 现状（已就绪的部分）

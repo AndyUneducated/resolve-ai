@@ -1,6 +1,6 @@
 # `resolveai-web` — Frontend
 
-Next.js 14 (app router) + Tailwind + shadcn-style components.
+Next.js 15 (app router) + Tailwind + shadcn-style components.
 
 ## 页面
 

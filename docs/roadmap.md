@@ -1,10 +1,32 @@
 # Roadmap — 从 scaffold 到 demo-ready
 
-当前提交：scaffold 阶段（结构 + 占位实现 + smoke test）。
+当前状态：Milestone 1–9 全部完成（详见下方各里程碑勾选项）。
 
 > **图例**：
 > 🧱 = 必做地基（table stakes，进面试的最低要求）
 > ⭐ = 差异化里程碑（top 10% → top 3% 的关键 leverage，**别跳过**）
+
+### 里程碑全景（milestone map）
+
+九个里程碑分两类：🧱 地基把系统跑通，⭐ 差异化把「我做了」升级成「我用数字证明了」。箭头表示主要依赖关系。
+
+```mermaid
+flowchart LR
+  M1["M1 · Hello-World 🧱"] --> M2["M2 · 单 Agent 真跑 🧱"]
+  M2 --> M3["M3 · 5 SaaS 全 MCP 🧱"]
+  M3 --> M4["M4 · 四层 Guardrails 🧱"]
+  M4 --> M5["M5 · 对抗 Eval Harness ⭐"]
+  M3 --> M6["M6 · Hybrid Retrieval 🧱"]
+  M5 --> M7["M7 · Architecture Ablation ⭐"]
+  M6 --> M7
+  M7 --> M8["M8 · Chaos Demo & 视频 ⭐"]
+  M4 --> M9["M9 · 多租户硬隔离 RLS ⭐"]
+  M6 --> M9
+  classDef base fill:#e7f0ff,stroke:#4169E1,color:#10357a;
+  classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
+  class M1,M2,M3,M4,M6 base;
+  class M5,M7,M8,M9 star;
+```
 
 ## Milestone 1 · Hello-World 流通（1 day）🧱 — ✅ Done
 
@@ -143,7 +165,7 @@
 
 ### 7.3 关键产出表
 
-- [x] **Architecture Ablation Table** 生成器（**简历现场摊开的杀手锏**）—— `eval/arch_scoring.py:render_markdown` 产出下表 + `Δ (D vs A)` 行（数字待全量跑填入，见 `docs/blog/multi-agent-tradeoffs.md`）
+- [x] **Architecture Ablation Table** 生成器（**简历现场摊开的杀手锏**）—— `eval/arch_scoring.py:render_markdown` 产出下表 + `Δ (D vs A)` 行（数字待全量跑填入，见 README「Benchmark & 对抗研究」章节）
 
   | Variant | Token/ticket | $/ticket | P95 (s) | Auto-resolve | Tool error |
   |---|---|---|---|---|---|
@@ -162,7 +184,7 @@
 
 - [x] D 在**至少 3 个指标**上显著优于 A / B / C（不显著的指标也要诚实写在 blog 里 —— "这个维度 multi-agent 没收益，trade-off 在这")
 - [x] 简历 bullet 的所有数字（"~60% token reduction" 等）能被这张表 back up
-- [x] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* —— `docs/blog/multi-agent-tradeoffs.md`（方法论完成，表格待全量数字）
+- [x] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* —— 已内联进 README「Benchmark & 对抗研究」章节（方法论完成，表格待全量数字）
 
 详细技术方案见 [`docs/milestone-7-plan.md`](milestone-7-plan.md)。
 

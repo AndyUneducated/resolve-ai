@@ -15,6 +15,28 @@
 | Output | `OutputGuardrail` 现做 Presidio re-scan、structured policy judge（`PolicyVerdict`）、针对 `tool_calls` 的 hallucinated entity checks |
 | Memory | `IsolatedCheckpointer` 在 checkpoint read/write 及 supervisor config propagation 上强制 `(tenant_id, customer_id)` namespace checks |
 
+四层挂在请求路径的不同位置：L1 在 LLM 之前、L2 包住每次工具调用、L3 在回复返回之前、L4 横跨整个 state 读写。任一层判定 block 都会直接中断（halt）。
+
+```mermaid
+flowchart TD
+  in["用户输入 User input"] --> l1
+  l1{"L1 Input<br/>Llama Guard · 注入检测 · Presidio"}
+  l1 -->|"命中 → block"| blocked["中断并返回拦截提示"]
+  l1 -->|放行| agent["Agent 推理"]
+  agent --> l2
+  l2{"L2 Exec<br/>gVisor 沙箱 + capability 白名单"}
+  l2 -->|"越权 → block"| blocked
+  l2 -->|放行| tool["工具调用结果"]
+  tool --> agent
+  agent --> answer["候选回复"]
+  answer --> l3
+  l3{"L3 Output<br/>Presidio 复扫 · policy judge · 幻觉实体检测"}
+  l3 -->|"命中 → block"| blocked
+  l3 -->|放行| out["返回用户 Response"]
+  l4[["L4 Memory<br/>(tenant_id, customer_id) 命名空间校验<br/>跨租户访问 → PermissionError"]]
+  agent <-->|"读 / 写 checkpoint"| l4
+```
+
 ---
 
 ## 2. 关键文件变更

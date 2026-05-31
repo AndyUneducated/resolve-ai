@@ -4,6 +4,15 @@ Milestone 8 demo 视频的带时间戳 voiceover + 屏幕字幕。本文件 capt
 
 Demo 分 live `/chat` UI（beats 1–2）与两张生成 artifact 页（beats 3–4）：`metrics.html` 与 `trace.html`（来自 `scripts/render_metrics_page.py`）。精确 run 步骤见 `shot-list.md`。
 
+四段 beats 时间线：从「正确」到「安全」再到「可测量」。
+
+```mermaid
+flowchart LR
+  b1["0:00–0:30<br/>正常 ticket<br/>Triage → Billing → refund"] --> b2["0:30–1:30<br/>对抗 ticket<br/>L1 标记注入 · L3 输出复扫"]
+  b2 --> b3["1:30–2:00<br/>跨租户攻击<br/>L4 → PermissionError"]
+  b3 --> b4["2:00–3:00<br/>Chaos load + 架构 Ablation 表"]
+```
+
 ---
 
 ## 0:00 – 0:30 · 正常 ticket（Triage → Billing → refund）
