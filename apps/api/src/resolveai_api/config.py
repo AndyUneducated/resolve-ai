@@ -39,6 +39,19 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://resolveai:resolveai@localhost:5432/resolveai",
         alias="DATABASE_URL",
     )
+    """管理员 DSN（resolveai，超级用户）：迁移 / seed / 扩展 / LangGraph checkpoint setup。"""
+
+    app_database_url: str = Field(default="", alias="APP_DATABASE_URL")
+    """应用运行时 DSN（M9）：tenant-scoped SQLAlchemy 查询（KbStore）以此连库。
+
+    应指向低权限角色 `resolveai_app`（NOSUPERUSER/NOBYPASSRLS），RLS 才会真正生效——
+    超级用户 / BYPASSRLS 角色无条件绕过 RLS，FORCE 也拦不住。留空则回退 `database_url`
+    （仅适用于未应用 0001_rls.sql 迁移、或刻意不启用硬隔离的环境）。"""
+
+    @property
+    def app_dsn(self) -> str:
+        """Effective DSN for the tenant-scoped app path (falls back to admin DSN)."""
+        return self.app_database_url or self.database_url
 
     # ---------- Checkpointer ----------
     checkpoint_backend: str = Field(default="postgres", alias="CHECKPOINT_BACKEND")
@@ -117,6 +130,12 @@ class Settings(BaseSettings):
 
     # ---------- Tenant ----------
     default_tenant_id: str = Field(default="demo", alias="DEFAULT_TENANT_ID")
+
+    # ---------- Multi-tenant isolation (M9 · Postgres RLS) ----------
+    rls_enabled: str = Field(default="on", alias="RLS_ENABLED")
+    """on (default) | off — on 时 tenant-scoped 查询走 `tenant_session`（事务内
+    `SET LOCAL app.tenant_id`）以激活数据库 RLS policy；off 时退回纯 app 层
+    `WHERE tenant_id` 过滤（用于未应用 0001_rls.sql 迁移的环境）。"""
 
     @property
     def cors_origins_list(self) -> list[str]:

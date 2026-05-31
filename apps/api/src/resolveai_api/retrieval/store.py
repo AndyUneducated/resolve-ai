@@ -11,20 +11,29 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from resolveai_api.config import get_settings
+from resolveai_api.core.db import tenant_session
+from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.retrieval.types import RetrievedDoc
 
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    """Process-wide async engine (psycopg3). DSN already uses postgresql+psycopg://."""
+    """Process-wide async engine (psycopg3) for tenant-scoped queries.
+
+    Uses `app_dsn` — the low-privilege `resolveai_app` role when configured — so
+    that Postgres RLS actually enforces (a superuser/BYPASSRLS connection would
+    silently bypass every policy). Falls back to the admin DSN when unset.
+    """
     settings = get_settings()
-    return create_async_engine(settings.database_url, pool_pre_ping=True)
+    return create_async_engine(settings.app_dsn, pool_pre_ping=True)
 
 
 def to_pgvector_literal(vec: list[float]) -> str:
@@ -79,10 +88,26 @@ class KbStore:
     def engine(self) -> AsyncEngine:
         return self._engine or get_engine()
 
+    @asynccontextmanager
+    async def _scoped_conn(self, tenant_id: str) -> AsyncIterator[AsyncConnection]:
+        """Yield a connection scoped to `tenant_id`.
+
+        When RLS is enabled we go through `tenant_session` (txn + `SET LOCAL
+        app.tenant_id`) so Postgres RLS backs up the app-layer `WHERE tenant_id`
+        filter (defense-in-depth). When disabled we fall back to a plain
+        read-only connection for environments without the 0001_rls.sql migration.
+        """
+        if flag_enabled(get_settings().rls_enabled):
+            async with tenant_session(self.engine, tenant_id) as conn:
+                yield conn
+        else:
+            async with self.engine.connect() as conn:
+                yield conn
+
     async def dense_search(
         self, *, query_embedding: list[float], tenant_id: str, k: int
     ) -> list[RetrievedDoc]:
-        async with self.engine.connect() as conn:
+        async with self._scoped_conn(tenant_id) as conn:
             result = await conn.execute(
                 _DENSE_SQL,
                 {
@@ -96,7 +121,7 @@ class KbStore:
     async def lexical_search(
         self, *, query: str, tenant_id: str, k: int
     ) -> list[RetrievedDoc]:
-        async with self.engine.connect() as conn:
+        async with self._scoped_conn(tenant_id) as conn:
             result = await conn.execute(
                 _LEXICAL_SQL,
                 {"q": query, "tenant_id": tenant_id, "k": k},

@@ -70,6 +70,13 @@ async def seed_kb(*, tenant_id: str, kb_path: Path, truncate: bool) -> int:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     inserted = 0
     async with engine.begin() as conn:
+        # FORCE ROW LEVEL SECURITY 下表 owner 也受 policy 约束（M9）：必须先把
+        # app.tenant_id 注入事务，否则 tenants / kb_documents 的 WITH CHECK 会拒插入。
+        # set_config(..., true) = SET LOCAL，随事务结束自动失效（fail-closed）。
+        await conn.execute(
+            text("SELECT set_config('app.tenant_id', :t, true)"),
+            {"t": tenant_id},
+        )
         await conn.execute(
             text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
             {"id": tenant_id, "name": f"{tenant_id} tenant"},

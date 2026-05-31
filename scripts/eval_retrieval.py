@@ -24,6 +24,7 @@ if str(ROOT / "apps" / "api" / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "apps" / "api" / "src"))
 
 from resolveai_api.config import get_settings  # noqa: E402
+from resolveai_api.core.db import tenant_session  # noqa: E402
 from resolveai_api.retrieval.hybrid import HybridRetriever  # noqa: E402
 from resolveai_api.retrieval.metrics import (  # noqa: E402
     aggregate,
@@ -51,7 +52,8 @@ def _load_golden(path: Path) -> list[dict[str, Any]]:
 async def _resolve_title_ids(tenant_id: str, titles: list[str]) -> dict[str, int]:
     if not titles:
         return {}
-    async with get_engine().connect() as conn:
+    engine = get_engine()
+    async with tenant_session(engine, tenant_id) as conn:
         result = await conn.execute(
             text(
                 "SELECT id, title FROM kb_documents "

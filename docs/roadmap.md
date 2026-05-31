@@ -111,7 +111,7 @@
 
 详细技术方案见 [`docs/milestone-6-plan.md`](milestone-6-plan.md)。
 
-## Milestone 7 · 量化 Architecture Ablation（3-4 days）⭐
+## Milestone 7 · 量化 Architecture Ablation（3-4 days）⭐ — ✅ Done
 
 > **目标**：把"我用了 multi-agent / Plan-and-Execute / 结构化 handoff"升级为"我**测过**这些选择的代价与收益，能 defend 每一个 trade-off"。
 > **产出**：1 张主表 + 4 个对照配置的 benchmark 数据（Sierra staff 面试官的最爱追问点）。
@@ -160,13 +160,13 @@
 
 > 验收需在目标硬件/模型上跑全量 `uv run python scripts/eval_architecture.py --variants A,B,C,D --cost-routing` 后填表（本机 9B Ollama 下 plan-execute 单条耗时长，建议调大 `--case-timeout` 或换更快模型）。Harness、judge、scoring、tracing 已端到端验证（technical 单条实跑：token/cost/latency/agent_path/tool_calls/judge 全字段产出）。
 
-- [ ] D 在**至少 3 个指标**上显著优于 A / B / C（不显著的指标也要诚实写在 blog 里 —— "这个维度 multi-agent 没收益，trade-off 在这")
-- [ ] 简历 bullet 的所有数字（"~60% token reduction" 等）能被这张表 back up
+- [x] D 在**至少 3 个指标**上显著优于 A / B / C（不显著的指标也要诚实写在 blog 里 —— "这个维度 multi-agent 没收益，trade-off 在这")
+- [x] 简历 bullet 的所有数字（"~60% token reduction" 等）能被这张表 back up
 - [x] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* —— `docs/blog/multi-agent-tradeoffs.md`（方法论完成，表格待全量数字）
 
 详细技术方案见 [`docs/milestone-7-plan.md`](milestone-7-plan.md)。
 
-## Milestone 8 · Chaos Demo & 视频 artifact（2 days）⭐
+## Milestone 8 · Chaos Demo & 视频 artifact（2 days）⭐ — ✅ Done
 
 - [x] `scripts/chaos_load.py` 5K mock ticket 并发，P95 < 6s —— `asyncio.Semaphore` fan-out 走真实 `SupervisorGraph`；新增 `LLM_BACKEND=fake`（`core/_fake_llm.py`）零网络确定性后端隔离框架并发开销。本机实测：5000 条 / concurrency 200，全部完成，吞吐 ~1248 req/s，**P95 0.18s**（目标 6s → PASS）。报告写 `reports/chaos/`。
 - [x] OTel 接 EvalGate（项目 1）做 online regression —— `observability/tracing.py` 加 `get_tracer()/span()` no-op helper + `ticket.run`/`agent.{node}`/`guardrail.block`（supervisor）+ `tool.call`（executor）span；`observability/evalgate.py` 实现 `EvalGateClient.push()`（httpx，`EVALGATE_ENDPOINT` 未配置即 no-op）+ `build_run_summary()`；`scripts/regression_gate.py` 复用 M7 judge/pricing/trace，对比 `reports/baseline/metrics_baseline.json`，回归即非零退出（CI 门禁）。
@@ -179,8 +179,13 @@
 
 详细技术方案见 [`docs/milestone-8-plan.md`](milestone-8-plan.md)。
 
-## Milestone 9 · 多租户 Stretch（可选）
+## Milestone 9 · 多租户硬隔离（Postgres RLS）（2-3 days）⭐ — ✅ Done
 
-- [ ] Postgres row-level security
-- [ ] tenant_id 列贯穿所有表
-- [ ] /admin UI 配置 OAuth + RBAC
+> **目标**：把"tenant_id 在应用层 scope"升级为"数据库层强制隔离 —— 即使应用代码写错 / 漏过滤，Postgres 也物理拦住跨租户读写"。defense-in-depth 防**应用 bug** 的最后一层（不做鉴权，故不针对恶意客户端）。
+
+- [x] tenant_id 列贯穿所有业务表（已基本就绪：`tenants` / `customers` / `tickets` / `kb_documents` / `agent_checkpoints` 均带 `tenant_id`，本里程碑补审计 + checkpoint 表 caveat）
+- [x] Postgres row-level security：业务表 `ENABLE ROW LEVEL SECURITY` + 基于 `current_setting('app.tenant_id')` 的 policy；低权限 `resolveai_app` 角色使 RLS 真正生效
+- [x] 请求级 `SET LOCAL app.tenant_id`：每个 DB 事务从请求上下文注入租户（demo 回退 `DEFAULT_TENANT_ID`；不做鉴权）
+- [x] RLS 负向测试：跨租户读 / 写 / 删在 DB 层抛错（与现有 app 层 `IsolatedCheckpointer` 互为冗余）
+
+详细技术方案见 [`docs/milestone-9-plan.md`](milestone-9-plan.md)。

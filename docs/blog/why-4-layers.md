@@ -1,29 +1,29 @@
-# Why customer-facing AI needs 4 layers of guardrails
+# 面向客户的 AI 为何需要 4 层 Guardrails
 
-_Draft title:_ **Why customer-facing AI needs 4 layers of guardrails: 200 adversarial prompts, attribution-tested**
+_草稿标题：_ **Why customer-facing AI needs 4 layers of guardrails: 200 adversarial prompts, attribution-tested**
 
-## Thesis
+## 论点
 
-A single "safety model" is not enough for customer support agents that can call tools and persist state. Guardrails must compose across:
+对能调用 tools 并持久化 state 的 customer support agents，单一「safety model」不够。Guardrails 必须在以下层次组合：
 
-1. **Input layer** for prompt-level intent and injection screening.
-2. **Execution layer** for tool runtime blast-radius containment.
-3. **Output layer** for policy and hallucination checks before user-visible text.
-4. **Memory layer** for tenant/customer isolation over checkpointed state.
+1. **Input layer** — prompt-level intent 与 injection screening。
+2. **Execution layer** — tool runtime blast-radius containment。
+3. **Output layer** — 用户可见文本前的 policy 与 hallucination checks。
+4. **Memory layer** — checkpointed state 上的 tenant/customer isolation。
 
-## Setup
+## 实验设置
 
-- 200 adversarial prompts:
-  - jailbreak (50)
-  - indirect injection (50)
-  - pii extraction (30)
-  - unauthorized concession (40)
-  - cross-tenant (30)
-- 50 benign support tickets for false-positive measurement
-- profile matrix:
+- 200 条 adversarial prompts：
+  - jailbreak（50）
+  - indirect injection（50）
+  - pii extraction（30）
+  - unauthorized concession（40）
+  - cross-tenant（30）
+- 50 条 benign support tickets，测 false-positive
+- Profile matrix：
   - `baseline`
-  - `l1_only`, `l3_only`, `l4_only`
-  - `ablate_l1`, `ablate_l3`, `ablate_l4`
+  - `l1_only`、`l3_only`、`l4_only`
+  - `ablate_l1`、`ablate_l3`、`ablate_l4`
 
 ## Layer Attribution Table
 
@@ -46,22 +46,22 @@ A single "safety model" is not enough for customer support agents that can call 
 
 ## False Positive Analysis
 
-- Baseline benign blocked: `TBD/TBD`
-- Top false-positive flags:
+- Baseline benign blocked：`TBD/TBD`
+- Top false-positive flags：
   - `TBD`
 
-## Interpretation
+## 解读
 
-### Why L2 may not move leak-rate tables
+### 为何 L2 可能不动 leak-rate 表
 
-Layer 2 is sandboxing. It limits what a successful injection can do at runtime (filesystem/network/process blast radius), but it does not itself classify user prompts or redact outgoing text. Therefore:
+Layer 2 是 sandboxing。它限制成功 injection 在 runtime 能做什么（filesystem/network/process blast radius），但不本身 classify 用户 prompts 或 redact  outgoing text。因此：
 
-- it is expected that L2 toggles may show little/no change in prompt-level leak metrics,
-- but L2 still materially reduces exploit impact if L1/L3 miss.
+- L2 toggle 在 prompt-level leak metrics 上 little/no change 是预期的，
+- 但若 L1/L3 miss，L2 仍 materially 降低 exploit impact。
 
-This distinction should be explicit in the write-up so "no table delta" is not misread as "no value."
+写文中应 explicit 这一 distinction，避免「表无 delta」被误读为「无价值」。
 
-## Repro steps
+## 复现步骤
 
 ```bash
 uv run python scripts/eval_adversarial.py
@@ -70,5 +70,5 @@ uv run python scripts/eval_report.py --input reports/eval_<timestamp>.jsonl
 
 ## Release notes
 
-- Include one concrete leaked example per ablation row.
-- If any layer does not improve metrics, keep it in the post with transparent trade-off analysis.
+- 每个 ablation 行包含一个 concrete leaked example。
+- 若某 layer 未改善 metrics，仍在文中保留并做 transparent trade-off analysis。
