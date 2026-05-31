@@ -21,8 +21,11 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from resolveai_api.guardrails.exec_sandbox import ExecutionSandbox
+from resolveai_api.observability.tracing import get_tracer, span
 
 logger = logging.getLogger(__name__)
+
+_TRACER = get_tracer("resolveai.executor")
 
 _GATED_CAPABILITIES = ("write", "destructive")
 
@@ -80,28 +83,46 @@ class Executor:
 
         from resolveai_api.core.usage import looks_like_error, record_tool_call
 
-        try:
-            async with self.sandbox.scope(tool=full) as scope:
-                output = await tool.ainvoke(args)
-        except Exception as exc:
-            # Record the failed call for ablation tool-error accounting, then
-            # re-raise so callers keep their existing error handling.
+        with span(
+            _TRACER,
+            "tool.call",
+            attributes={"tool": full, "capability": capability, "audit": audit},
+        ) as tool_span:
+            try:
+                async with self.sandbox.scope(tool=full) as scope:
+                    output = await tool.ainvoke(args)
+            except Exception as exc:
+                # Record the failed call for ablation tool-error accounting, then
+                # re-raise so callers keep their existing error handling.
+                record_tool_call(
+                    tool=full,
+                    args=args,
+                    output=f"{type(exc).__name__}: {exc}",
+                    is_error=True,
+                    duration_ms=0.0,
+                )
+                if tool_span is not None:
+                    try:
+                        tool_span.set_attribute("error", True)
+                        tool_span.set_attribute("error_type", type(exc).__name__)
+                    except Exception:  # pragma: no cover - defensive
+                        pass
+                raise
+
+            is_error = looks_like_error(output)
             record_tool_call(
                 tool=full,
                 args=args,
-                output=f"{type(exc).__name__}: {exc}",
-                is_error=True,
-                duration_ms=0.0,
+                output=output,
+                is_error=is_error,
+                duration_ms=scope.duration_ms,
             )
-            raise
-
-        record_tool_call(
-            tool=full,
-            args=args,
-            output=output,
-            is_error=looks_like_error(output),
-            duration_ms=scope.duration_ms,
-        )
+            if tool_span is not None:
+                try:
+                    tool_span.set_attribute("error", is_error)
+                    tool_span.set_attribute("duration_ms", scope.duration_ms)
+                except Exception:  # pragma: no cover - defensive
+                    pass
 
         if audit:
             # Layer 3 (M4) will cross-check these against output guardrails.

@@ -168,14 +168,16 @@
 
 ## Milestone 8 · Chaos Demo & 视频 artifact（2 days）⭐
 
-- [ ] `scripts/chaos_load.py` 5K mock ticket 并发，P95 < 6s
-- [ ] OTel 接 EvalGate（项目 1）做 online regression
-- [ ] **3 分钟 Demo 视频**（Loom / YouTube），脚本：
-  - 0:00-0:30 正常 ticket：Triage → Billing → Stripe refund → 成功
-  - 0:30-1:30 对抗 ticket：indirect injection 被 Layer 1 漏过，Layer 3 policy check 截住，trace UI 高亮
-  - 1:30-2:00 跨租户串号攻击：namespace check 抛 PermissionError，trace 复现
-  - 2:00-3:00 chaos load 实时 metrics + 现场看 Architecture Ablation 表
-- [ ] 简历 bullet 直接挂视频链接
+- [x] `scripts/chaos_load.py` 5K mock ticket 并发，P95 < 6s —— `asyncio.Semaphore` fan-out 走真实 `SupervisorGraph`；新增 `LLM_BACKEND=fake`（`core/_fake_llm.py`）零网络确定性后端隔离框架并发开销。本机实测：5000 条 / concurrency 200，全部完成，吞吐 ~1248 req/s，**P95 0.18s**（目标 6s → PASS）。报告写 `reports/chaos/`。
+- [x] OTel 接 EvalGate（项目 1）做 online regression —— `observability/tracing.py` 加 `get_tracer()/span()` no-op helper + `ticket.run`/`agent.{node}`/`guardrail.block`（supervisor）+ `tool.call`（executor）span；`observability/evalgate.py` 实现 `EvalGateClient.push()`（httpx，`EVALGATE_ENDPOINT` 未配置即 no-op）+ `build_run_summary()`；`scripts/regression_gate.py` 复用 M7 judge/pricing/trace，对比 `reports/baseline/metrics_baseline.json`，回归即非零退出（CI 门禁）。
+- [x] **3 分钟 Demo 视频**（自动化录制 + 旁白脚本）—— `apps/web/demo/record.spec.ts`（Playwright，烧字幕，输出真实 `webm`）走 4 段脚本；UI 保持现状，trace/metrics 段由 `scripts/render_metrics_page.py` 生成 `trace.html` / `metrics.html` 供录制：
+  - 0:00-0:30 正常 ticket：Triage → Billing → refund → 成功（live `/chat`）
+  - 0:30-1:30 对抗 ticket：indirect injection 被 Layer 1 标记（flag chip），Layer 3 输出侧 re-scan（trace 高亮）
+  - 1:30-2:00 跨租户串号攻击：`IsolatedCheckpointer` namespace check 抛 `CrossTenantAccessBlocked`，trace 复现命名空间 mismatch
+  - 2:00-3:00 chaos load 实时 metrics（P95 gate）+ Architecture Ablation 表
+- [x] 简历 bullet 直接挂视频链接 —— 见 [`docs/milestone-8-plan.md`](milestone-8-plan.md) §2（录制后填 Loom/YouTube 链接）。旁白/分镜：[`docs/demo/narration.md`](demo/narration.md) · [`docs/demo/shot-list.md`](demo/shot-list.md)
+
+详细技术方案见 [`docs/milestone-8-plan.md`](milestone-8-plan.md)。
 
 ## Milestone 9 · 多租户 Stretch（可选）
 

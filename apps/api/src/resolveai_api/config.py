@@ -18,7 +18,11 @@ class Settings(BaseSettings):
 
     # ---------- LLM ----------
     llm_backend: str = Field(default="ollama", alias="LLM_BACKEND")
-    """ollama (default) | anthropic — switch via env without code changes."""
+    """ollama (default) | anthropic | fake — switch via env without code changes.
+
+    `fake` returns deterministic, zero-latency canned responses (M8 chaos load
+    testing); it never touches the network.
+    """
     ollama_base_url: str = Field(
         default="http://127.0.0.1:11434", alias="OLLAMA_BASE_URL"
     )

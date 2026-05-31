@@ -1,17 +1,23 @@
-.PHONY: help install dev api web seed test red-team lint fmt typecheck clean
+.PHONY: help install dev api web seed test red-team lint fmt typecheck clean \
+	chaos regression-gate demo-assets demo-record obs
 
 help:
 	@echo "Targets:"
-	@echo "  install     安装 Python + Node 依赖"
-	@echo "  dev         同时启动后端 (api) + 前端 (web)"
-	@echo "  api         仅启动 FastAPI 后端"
-	@echo "  web         仅启动 Next.js 前端"
-	@echo "  seed        初始化 Postgres + 灌入 FAQ / 演示 ticket"
-	@echo "  test        跑 pytest + frontend lint"
-	@echo "  red-team    跑 200 个 adversarial prompt"
-	@echo "  lint        ruff + eslint"
-	@echo "  fmt         ruff format + prettier"
-	@echo "  typecheck   mypy + tsc"
+	@echo "  install         安装 Python + Node 依赖"
+	@echo "  dev             同时启动后端 (api) + 前端 (web)"
+	@echo "  api             仅启动 FastAPI 后端"
+	@echo "  web             仅启动 Next.js 前端"
+	@echo "  seed            初始化 Postgres + 灌入 FAQ / 演示 ticket"
+	@echo "  test            跑 pytest + frontend lint"
+	@echo "  red-team        跑 200 个 adversarial prompt"
+	@echo "  chaos           5K mock ticket 并发压测（M8，默认 fake backend）"
+	@echo "  regression-gate online regression 门禁（对比 baseline）"
+	@echo "  demo-assets     生成 demo 用 metrics.html / trace.html"
+	@echo "  demo-record     生成 assets 后用 Playwright 录制 demo 视频"
+	@echo "  obs             启动本地 OTel collector（--profile obs）"
+	@echo "  lint            ruff + eslint"
+	@echo "  fmt             ruff format + prettier"
+	@echo "  typecheck       mypy + tsc"
 
 install:
 	uv sync
@@ -38,6 +44,23 @@ test:
 
 red-team:
 	uv run python scripts/red_team.py
+
+chaos:
+	uv run python scripts/chaos_load.py --total 5000 --concurrency 200
+
+regression-gate:
+	uv run python scripts/regression_gate.py
+
+demo-assets:
+	uv run python scripts/render_metrics_page.py
+
+demo-record: demo-assets
+	# Drives /chat + the generated artifacts and writes apps/web/demo/output/*.webm.
+	# Start `make dev` first (ideally API under LLM_BACKEND=fake) for the chat beats.
+	cd apps/web && npm run demo:record
+
+obs:
+	docker compose --profile obs up
 
 lint:
 	uv run ruff check .

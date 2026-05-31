@@ -11,6 +11,7 @@ Per-request:
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import AsyncIterator, Callable, MutableSequence
 from dataclasses import dataclass
@@ -37,6 +38,9 @@ from resolveai_api.guardrails.input_filter import InputGuardrail
 from resolveai_api.guardrails.memory_isolator import MemoryIsolator
 from resolveai_api.guardrails.output_filter import OutputGuardrail
 from resolveai_api.mcp.toolbelt import ToolBelt
+from resolveai_api.observability.tracing import get_tracer, span
+
+_TRACER = get_tracer("resolveai.supervisor")
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,14 @@ def _extract_text(msg: BaseMessage | dict | object) -> str:
     if isinstance(content, str):
         return content
     return str(content)
+
+
+def _set(otel_span: object | None, key: str, value: object) -> None:
+    """Set an attribute on an optional OTel span (no-op when tracing is off)."""
+    if otel_span is None:
+        return
+    with contextlib.suppress(Exception):  # pragma: no cover - defensive
+        otel_span.set_attribute(key, value)  # type: ignore[attr-defined]
 
 
 ReportSink = Callable[[GuardrailReport], None] | MutableSequence[GuardrailReport]
@@ -181,65 +193,111 @@ class SupervisorGraph:
         # *stored* checkpoint namespace against the current request identity).
         namespace = MemoryIsolator.namespace(tenant_id, customer_id, thread_id)
 
-        # Layer 1 input guardrails
-        scrubbed, flags = await self.input_guard.scan_and_redact(message)
-        all_flags = list(flags)
-        if blocked_by_flags(flags):
-            _emit_report(report_sink, all_flags)
-            yield {"type": "blocked", "data": json.dumps({"reason": flags})}
-            return
+        with span(
+            _TRACER,
+            "ticket.run",
+            attributes={
+                "tenant_id": tenant_id,
+                "customer_id": customer_id,
+                "thread_id": thread_id,
+            },
+        ) as ticket_span:
+            # Layer 1 input guardrails
+            scrubbed, flags = await self.input_guard.scan_and_redact(message)
+            all_flags = list(flags)
+            if blocked_by_flags(flags):
+                _emit_report(report_sink, all_flags)
+                _set(ticket_span, "outcome", "blocked")
+                _set(ticket_span, "blocked_layer", "input")
+                with span(_TRACER, "guardrail.block", attributes={"layer": "input"}):
+                    pass
+                yield {"type": "blocked", "data": json.dumps({"reason": flags})}
+                return
 
-        initial: GraphState = {
-            "messages": [HumanMessage(content=scrubbed)],
-            "tenant_id": tenant_id,
-            "customer_id": customer_id,
-            "thread_id": thread_id,
-            "tool_calls": [],
-            "guardrail_flags": flags,
-        }
-        config = {
-            "configurable": {
-                "thread_id": namespace,
-                "user_tenant_id": tenant_id,
-                "user_customer_id": customer_id,
+            initial: GraphState = {
+                "messages": [HumanMessage(content=scrubbed)],
+                "tenant_id": tenant_id,
+                "customer_id": customer_id,
+                "thread_id": thread_id,
+                "tool_calls": [],
+                "guardrail_flags": flags,
             }
-        }
+            config = {
+                "configurable": {
+                    "thread_id": namespace,
+                    "user_tenant_id": tenant_id,
+                    "user_customer_id": customer_id,
+                }
+            }
 
-        try:
-            async for event in self.graph.astream(initial, config=config):
-                for node_name, node_state in event.items():
-                    msgs = (
-                        node_state.get("messages", []) if isinstance(node_state, dict) else []
-                    )
-                    if not msgs:
-                        continue
-                    content = _extract_text(msgs[-1])
-                    # Layer 3 output guardrails
-                    tool_calls = (
-                        node_state.get("tool_calls", [])
-                        if isinstance(node_state, dict)
-                        else []
-                    )
-                    safe, out_flags = await self.output_guard.scan(content, tool_calls)
-                    if out_flags:
-                        all_flags.extend(out_flags)
-                    if blocked_by_flags(out_flags):
-                        _emit_report(report_sink, all_flags)
-                        yield {"type": "blocked", "data": json.dumps({"reason": out_flags})}
-                        return
-                    yield {
-                        "type": "agent_step",
-                        "data": json.dumps(
-                            {"agent": node_name, "content": safe, "flags": out_flags}
-                        ),
-                    }
-        except CrossTenantAccessBlocked:
-            all_flags.append("cross_tenant_blocked")
+            try:
+                async for event in self.graph.astream(initial, config=config):
+                    for node_name, node_state in event.items():
+                        msgs = (
+                            node_state.get("messages", [])
+                            if isinstance(node_state, dict)
+                            else []
+                        )
+                        if not msgs:
+                            continue
+                        content = _extract_text(msgs[-1])
+                        # Layer 3 output guardrails
+                        tool_calls = (
+                            node_state.get("tool_calls", [])
+                            if isinstance(node_state, dict)
+                            else []
+                        )
+                        with span(
+                            _TRACER,
+                            f"agent.{node_name}",
+                            attributes={
+                                "agent": node_name,
+                                "content_len": len(content),
+                            },
+                        ) as agent_span:
+                            safe, out_flags = await self.output_guard.scan(
+                                content, tool_calls
+                            )
+                            _set(agent_span, "flag_count", len(out_flags))
+                            if out_flags:
+                                all_flags.extend(out_flags)
+                            if blocked_by_flags(out_flags):
+                                _emit_report(report_sink, all_flags)
+                                _set(agent_span, "blocked", True)
+                                _set(ticket_span, "outcome", "blocked")
+                                _set(ticket_span, "blocked_layer", "output")
+                                with span(
+                                    _TRACER,
+                                    "guardrail.block",
+                                    attributes={"layer": "output"},
+                                ):
+                                    pass
+                                yield {
+                                    "type": "blocked",
+                                    "data": json.dumps({"reason": out_flags}),
+                                }
+                                return
+                        yield {
+                            "type": "agent_step",
+                            "data": json.dumps(
+                                {"agent": node_name, "content": safe, "flags": out_flags}
+                            ),
+                        }
+            except CrossTenantAccessBlocked:
+                all_flags.append("cross_tenant_blocked")
+                _emit_report(report_sink, all_flags)
+                _set(ticket_span, "outcome", "blocked")
+                _set(ticket_span, "blocked_layer", "tenant_isolation")
+                with span(
+                    _TRACER, "guardrail.block", attributes={"layer": "tenant_isolation"}
+                ):
+                    pass
+                yield {
+                    "type": "blocked",
+                    "data": json.dumps({"reason": ["cross_tenant_blocked"]}),
+                }
+                return
             _emit_report(report_sink, all_flags)
-            yield {
-                "type": "blocked",
-                "data": json.dumps({"reason": ["cross_tenant_blocked"]}),
-            }
-            return
-        _emit_report(report_sink, all_flags)
-        yield {"type": "done", "data": "{}"}
+            _set(ticket_span, "outcome", "done")
+            _set(ticket_span, "flag_count", len(all_flags))
+            yield {"type": "done", "data": "{}"}

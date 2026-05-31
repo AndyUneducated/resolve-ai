@@ -39,6 +39,11 @@ def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
     model = _model_name(tier)
     callbacks = [tier_callback(tier)]
 
+    if settings.llm_backend == "fake":
+        from resolveai_api.core._fake_llm import FakeChatModel
+
+        return FakeChatModel(callbacks=callbacks)
+
     if settings.llm_backend == "ollama":
         from langchain_ollama import ChatOllama
 
@@ -55,7 +60,7 @@ def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
         return ChatAnthropic(model=model, temperature=temperature, callbacks=callbacks)
 
     raise ValueError(
-        f"Unsupported LLM_BACKEND={settings.llm_backend!r}; expected 'ollama' or 'anthropic'."
+        f"Unsupported LLM_BACKEND={settings.llm_backend!r}; expected 'ollama' | 'anthropic' | 'fake'."
     )
 
 
@@ -70,4 +75,8 @@ def make_structured_llm(
     Uses `with_structured_output` (LangChain 1.x standard) — local Ollama goes
     through JSON mode; cloud providers use native structured-output APIs.
     """
+    if get_settings().llm_backend == "fake":
+        from resolveai_api.core._fake_llm import FakeStructuredRunnable
+
+        return FakeStructuredRunnable(schema)
     return make_llm(tier, temperature=temperature).with_structured_output(schema)
