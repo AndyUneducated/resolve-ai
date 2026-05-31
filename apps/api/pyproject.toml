@@ -26,7 +26,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.1",
 
     # DB / Retrieval
-    "sqlalchemy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",  # asyncio extra pulls greenlet (required by create_async_engine)
     "psycopg[binary]>=3.2",
     "pgvector>=0.3",
     "rank-bm25>=0.2",
@@ -41,6 +41,13 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.30",
     "opentelemetry-instrumentation-fastapi>=0.51b0",
     "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+# 精排重依赖（torch 等）独立成组，base 安装保持轻量；
+# Reranker 未装时自动降级到 RRF 融合排序（见 retrieval/reranker.py）。
+rerank = [
+    "sentence-transformers>=3.0",
 ]
 
 [build-system]

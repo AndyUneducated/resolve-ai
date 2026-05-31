@@ -79,6 +79,31 @@ class Settings(BaseSettings):
     guardrail_l3: str = Field(default="on", alias="GUARDRAIL_L3")
     guardrail_l4: str = Field(default="on", alias="GUARDRAIL_L4")
 
+    # ---------- Retrieval (M6 · Hybrid Retrieval) ----------
+    # 调库优先：embedding 走 langchain-ollama / langchain-openai 现成 Embeddings；
+    # 向量检索走 pgvector；BM25 走 Postgres ts_rank_cd；精排走 sentence-transformers。
+    embedding_backend: str = Field(default="ollama", alias="EMBEDDING_BACKEND")
+    """ollama (default) | openai — embedding 客户端后端。"""
+    embedding_model: str = Field(default="bge-m3", alias="EMBEDDING_MODEL")
+    """默认 bge-m3 → 1024 维，与 kb_documents.embedding vector(1024) 对齐。"""
+    embedding_dim: int = Field(default=1024, alias="EMBEDDING_DIM")
+    """强校验维度，seed 与 query 两端必须一致。"""
+
+    retrieval_profile: str = Field(default="hybrid", alias="RETRIEVAL_PROFILE")
+    """hybrid (BM25 + dense + RRF) | dense_only (降级路径，用于 M7 ablation)。"""
+    retrieval_top_k: int = Field(default=5, alias="RETRIEVAL_TOP_K")
+    """最终返回给 Agent 的文档数（reranker 之后）。"""
+    retrieval_candidate_k: int = Field(default=50, alias="RETRIEVAL_CANDIDATE_K")
+    """每路召回的候选数（送入 RRF 融合）。"""
+    retrieval_rrf_k: int = Field(default=60, alias="RETRIEVAL_RRF_K")
+    """RRF 常数 k；越大越平滑，行业默认 60。"""
+
+    reranker_enabled: str = Field(default="on", alias="RERANKER_ENABLED")
+    """on | off — 关掉则回退 RRF 融合排序（reranker 依赖未装时自动降级）。"""
+    reranker_model: str = Field(
+        default="BAAI/bge-reranker-v2-m3", alias="RERANKER_MODEL"
+    )
+
     # ---------- Observability ----------
     otel_endpoint: str = Field(
         default="http://localhost:4318", alias="OTEL_EXPORTER_OTLP_ENDPOINT"

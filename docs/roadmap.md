@@ -102,12 +102,14 @@
 - [x] 良性 ticket false positive ≤ 5%（由报告脚本自动计算）
 - [x] **每一层关掉都能找到至少 1 个新增漏过 case**（L2 作为 blast-radius 层，指标解释写入 blog）
 
-## Milestone 6 · Hybrid Retrieval（2 days）🧱
+## Milestone 6 · Hybrid Retrieval（2 days）🧱 — ✅ Done
 
-- [ ] Postgres 灌 50+ 条 FAQ / runbook（带 embedding）
-- [ ] BM25 (ts_rank_cd) + dense (cosine) 双路 + RRF 融合
-- [ ] bge-reranker-v2-m3 精排
-- [ ] Technical Agent 跑 KB-grounded 回复
+- [x] Postgres 灌 50+ 条 FAQ / runbook（带 embedding）
+- [x] BM25 (ts_rank_cd) + dense (cosine) 双路 + RRF 融合
+- [x] bge-reranker-v2-m3 精排
+- [x] Technical Agent 跑 KB-grounded 回复
+
+详细技术方案见 [`docs/milestone-6-plan.md`](milestone-6-plan.md)。
 
 ## Milestone 7 · 量化 Architecture Ablation（3-4 days）⭐
 

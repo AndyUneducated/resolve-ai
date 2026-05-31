@@ -1,0 +1,22 @@
+{"id": "kbq-001", "query": "Our API keeps returning 502 errors intermittently, what should we check?", "expected_titles": ["Resolve 502 Bad Gateway errors on the API"]}
+{"id": "kbq-002", "query": "Why are my webhooks being retried and how many times?", "expected_titles": ["Webhook delivery retries and exponential backoff", "Debugging missing webhook events"]}
+{"id": "kbq-003", "query": "I am getting HTTP 429 too many requests", "expected_titles": ["API rate limits and 429 handling"]}
+{"id": "kbq-004", "query": "How do I rotate an API key without downtime?", "expected_titles": ["Rotating and revoking API keys"]}
+{"id": "kbq-005", "query": "Set up single sign-on with our SAML identity provider", "expected_titles": ["Configuring SSO with SAML"]}
+{"id": "kbq-006", "query": "Users cannot log in after resetting their password", "expected_titles": ["Troubleshooting login failures after password reset"]}
+{"id": "kbq-007", "query": "My CSV export downloads an empty file", "expected_titles": ["CSV export returns empty files"]}
+{"id": "kbq-008", "query": "The dashboard is very slow to load in Chrome", "expected_titles": ["Dashboard loads slowly in the browser"]}
+{"id": "kbq-009", "query": "How can I tell if an outage only affects one region?", "expected_titles": ["Diagnosing regional integration outages"]}
+{"id": "kbq-010", "query": "Best practices for storing API keys securely", "expected_titles": ["Securing API keys in your application"]}
+{"id": "kbq-011", "query": "How do I verify the signature on an incoming webhook?", "expected_titles": ["Webhook signature verification"]}
+{"id": "kbq-012", "query": "I was charged twice for the same payment", "expected_titles": ["Understanding duplicate charges"]}
+{"id": "kbq-013", "query": "How long do refunds take to appear?", "expected_titles": ["How refunds are processed"]}
+{"id": "kbq-014", "query": "Why did my invoice total change from last month?", "expected_titles": ["Invoice amount changed between months", "Proration on plan upgrades"]}
+{"id": "kbq-015", "query": "How do I update the credit card on file?", "expected_titles": ["Updating your payment method"]}
+{"id": "kbq-016", "query": "My subscription renewed automatically, can I cancel?", "expected_titles": ["Subscription auto-renewal and cancellation"]}
+{"id": "kbq-017", "query": "A coupon code is not being accepted at checkout", "expected_titles": ["Applying discount and coupon codes"]}
+{"id": "kbq-018", "query": "When should a ticket be escalated to a human engineer?", "expected_titles": ["When to escalate to a human agent"]}
+{"id": "kbq-019", "query": "What are the SLA response times for critical issues?", "expected_titles": ["SLA tiers and response times"]}
+{"id": "kbq-020", "query": "How do we handle a suspected fraudulent account?", "expected_titles": ["Suspected fraud handling"]}
+{"id": "kbq-021", "query": "How do idempotency keys prevent duplicate requests?", "expected_titles": ["Understanding idempotency keys"]}
+{"id": "kbq-022", "query": "How do I confirm whether a refund was already issued?", "expected_titles": ["Refund status verification"]}
