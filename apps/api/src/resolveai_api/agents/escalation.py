@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import BaseTool
 
 from resolveai_api.agents.base import AgentConfig, BaseAgent
@@ -60,18 +60,32 @@ def _intent_to_channel(intent: str | None) -> str:
     return DEFAULT_ONCALL_CHANNEL
 
 
-def _packet(state: GraphState) -> str:
-    summary = state.get("ticket_summary") or {}
+def _packet(state: GraphState, handoff: str = "structured") -> str:
     tool_calls = state.get("tool_calls") or []
+    if handoff == "full_transcript":
+        msgs = state.get("messages") or []
+        transcript = "\n".join(
+            m.content
+            for m in msgs
+            if isinstance(m, BaseMessage) and isinstance(m.content, str) and m.content
+        )
+        context = f"Full transcript:\n{transcript}"
+    else:
+        summary = state.get("ticket_summary") or {}
+        context = f"Ticket summary: {json.dumps(dict(summary), default=str)}"
     return (
-        f"Ticket summary: {json.dumps(dict(summary), default=str)}\n"
+        f"{context}\n"
         f"Past tool calls ({len(tool_calls)}): {json.dumps(tool_calls, default=str)[:2000]}"
     )
 
 
 class EscalationAgent(BaseAgent):
+    def __init__(self, *, handoff: str = "structured", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._handoff = handoff
+
     @classmethod
-    def default(cls, **kwargs: Any) -> EscalationAgent:
+    def default(cls, *, handoff: str = "structured", **kwargs: Any) -> EscalationAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -81,14 +95,14 @@ class EscalationAgent(BaseAgent):
             system_prompt=SYSTEM_PROMPT,
             tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)
+        return cls(config=config, handoff=handoff, **kwargs)
 
     async def run(self, state: GraphState) -> GraphState:
         summary = state.get("ticket_summary") or {}
         intent = summary.get("intent")
         ticket_id = (summary.get("entities") or {}).get("ticket_id") or "zd_001"
         channel = _intent_to_channel(intent)
-        packet = _packet(state)
+        packet = _packet(state, self._handoff)
         tool_calls = list(state.get("tool_calls") or [])
 
         outcomes: list[str] = []

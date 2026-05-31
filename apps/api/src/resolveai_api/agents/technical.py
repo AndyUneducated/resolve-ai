@@ -102,13 +102,20 @@ def _format_kb_context(docs: list[RetrievedDoc]) -> str:
 class TechnicalAgent(BaseAgent):
     """KB-grounded technical agent. Retriever is injectable (None → load default)."""
 
-    def __init__(self, *, retriever: Any | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        retriever: Any | None = None,
+        handoff: str = "structured",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self._retriever = retriever
         self._retriever_resolved = retriever is not None
+        self._handoff = handoff
 
     @classmethod
-    def default(cls, **kwargs: Any) -> TechnicalAgent:
+    def default(cls, *, handoff: str = "structured", **kwargs: Any) -> TechnicalAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -118,7 +125,7 @@ class TechnicalAgent(BaseAgent):
             system_prompt=SYSTEM_PROMPT,
             tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)
+        return cls(config=config, handoff=handoff, **kwargs)
 
     def _get_retriever(self) -> Any | None:
         if not self._retriever_resolved:
@@ -211,6 +218,17 @@ class TechnicalAgent(BaseAgent):
                 tool_calls.append(
                     {"step": "zendesk.get_ticket_history", "error": str(exc)}
                 )
+
+        # Variant B (full_transcript handoff): replay the whole conversation as
+        # supplementary context instead of relying on the structured summary.
+        if self._handoff == "full_transcript":
+            transcript = "\n".join(
+                m.content
+                for m in messages
+                if isinstance(m, BaseMessage) and isinstance(m.content, str) and m.content
+            )
+            if transcript:
+                context_lines.append(f"Full conversation transcript:\n{transcript}")
 
         # ---- 3. Grounded answer generation + citation verification ----
         message, answer_flags = await self._generate_answer(

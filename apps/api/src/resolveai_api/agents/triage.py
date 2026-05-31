@@ -70,21 +70,28 @@ def _last_user_text(state: GraphState) -> str:
 
 
 class TriageAgent(BaseAgent):
+    def __init__(self, *, tier: str = "triage", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        # Cost-routing knob: variant D uses the cheap `triage` tier; the
+        # cost-routing ablation runs the same graph with tier="vertical".
+        self._tier = tier
+
     @classmethod
-    def default(cls, **kwargs: Any) -> TriageAgent:
+    def default(cls, *, tier: str = "triage", **kwargs: Any) -> TriageAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
+        model = settings.triage_model if tier == "triage" else settings.vertical_model
         config = AgentConfig(
             name="triage",
-            model=settings.triage_model,
+            model=model,
             system_prompt=SYSTEM_PROMPT,
             tool_whitelist=[],
         )
-        return cls(config=config, **kwargs)
+        return cls(config=config, tier=tier, **kwargs)
 
     async def _classify(self, user_text: str) -> TriageOutput:
-        llm = make_structured_llm("triage", TriageOutput)
+        llm = make_structured_llm(self._tier, TriageOutput)
         result = await llm.ainvoke(
             [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user_text)]
         )

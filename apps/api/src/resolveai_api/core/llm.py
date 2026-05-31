@@ -27,9 +27,17 @@ def _model_name(tier: LLMTier) -> str:
 
 
 def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
-    """Return a chat model bound to the configured backend + tier."""
+    """Return a chat model bound to the configured backend + tier.
+
+    Every model carries a tier-tagged usage callback; it is a no-op unless a
+    `core.usage.capture_run()` trace is active (M7 ablation accounting), so the
+    production path is unchanged.
+    """
+    from resolveai_api.core.usage import tier_callback
+
     settings = get_settings()
     model = _model_name(tier)
+    callbacks = [tier_callback(tier)]
 
     if settings.llm_backend == "ollama":
         from langchain_ollama import ChatOllama
@@ -38,12 +46,13 @@ def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
             model=model,
             base_url=settings.ollama_base_url,
             temperature=temperature,
+            callbacks=callbacks,
         )
 
     if settings.llm_backend == "anthropic":
         from langchain_anthropic import ChatAnthropic
 
-        return ChatAnthropic(model=model, temperature=temperature)
+        return ChatAnthropic(model=model, temperature=temperature, callbacks=callbacks)
 
     raise ValueError(
         f"Unsupported LLM_BACKEND={settings.llm_backend!r}; expected 'ollama' or 'anthropic'."

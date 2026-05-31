@@ -118,10 +118,10 @@
 
 ### 7.1 Benchmark 数据集
 
-- [ ] `tests/fixtures/benchmark_tickets.jsonl` —— 100-200 条真实风格 ticket：
-  - 60% billing / 30% technical / 10% escalation
-  - 每条标 ground truth：expected_intent / expected_resolution_path / expected_tool_calls
-  - 复用 EvalGate（项目 1）做 LLM-judge 评 final answer 质量
+- [x] `apps/api/tests/fixtures/benchmark_tickets.jsonl` —— 120 条真实风格 ticket（手写，对齐 MCP mock seed：ch_001..ch_005 / cus_demo_001..003 / zd_001..004）：
+  - 72 billing / 36 technical / 12 escalation（60/30/10）
+  - 每条标 ground truth：`expected_intent` / `expected_resolution_path` / `expected_tool_calls` + `rubric`
+  - LLM-judge（`eval/judge.py` · `ResolutionJudge`）按 rubric 评 final answer 是否真解决
 
 ### 7.2 4 个对照配置
 
@@ -132,33 +132,39 @@
 | **C · 4-Agent + ReAct（替代 Plan-and-Execute）** | 业务 Agent 单步循环 vs 多步规划 | 量化 Plan-and-Execute 的真实收益 |
 | **D · 最终方案**（4-Agent + 结构化 handoff + Plan-and-Execute + Cost Routing） | baseline | — |
 
-- [ ] `scripts/eval_architecture.py` —— 对每个 variant 跑全 benchmark，记录：
-  - **Token / ticket**（in + out 分开）
-  - **$ / ticket**（按 variant 实际走的模型计价）
+- [x] `scripts/eval_architecture.py` —— 对每个 variant 跑全 benchmark，记录：
+  - **Token / ticket**（in + out 分开；真实 Ollama token，经 `core/usage.py` contextvar trace 按 tier 归集，含子图/结构化输出调用）
+  - **$ / ticket**（按 tier 模型计价 · `eval/pricing.py`：triage≈Haiku / vertical≈Sonnet 公开价；token 真实、美元建模）
   - **Latency P50 / P95**
   - **Auto-resolution rate**（LLM-judge 评是否真解决）
-  - **Tool error rate**（工具选错 / 参数错 / hallucinated entity）
+  - **Tool error rate**（工具选错 / 调用失败 / hallucinated entity · `eval/trace.py:classify_tool_errors`）
+
+> 4 个对照配置通过 `eval/variants.py` 的 `VariantSpec`（topology / handoff / business_strategy / triage_tier 四轴）+ `SupervisorGraph(options=GraphOptions(...))` 表达；生产路径默认即 variant D，M1-M6 行为不变（108/108 测试绿）。
 
 ### 7.3 关键产出表
 
-- [ ] **Architecture Ablation Table**（**简历现场摊开的杀手锏**）
+- [x] **Architecture Ablation Table** 生成器（**简历现场摊开的杀手锏**）—— `eval/arch_scoring.py:render_markdown` 产出下表 + `Δ (D vs A)` 行（数字待全量跑填入，见 `docs/blog/multi-agent-tradeoffs.md`）
 
   | Variant | Token/ticket | $/ticket | P95 (s) | Auto-resolve | Tool error |
   |---|---|---|---|---|---|
-  | A · Single-Agent | ? | ? | ? | ?% | ?% |
-  | B · 4-Agent + full transcript handoff | ? | ? | ? | ?% | ?% |
-  | C · 4-Agent + ReAct | ? | ? | ? | ?% | ?% |
-  | **D · 最终方案** | ? | ? | ? | ?% | ?% |
-  | **Δ (D vs A)** | -??% | -??% | -??% | +??pp | -??pp |
+  | A · Single-Agent | TBD | TBD | TBD | TBD | TBD |
+  | B · 4-Agent + full transcript handoff | TBD | TBD | TBD | TBD | TBD |
+  | C · 4-Agent + ReAct | TBD | TBD | TBD | TBD | TBD |
+  | **D · 最终方案** | TBD | TBD | TBD | TBD | TBD |
+  | **Δ (D vs A)** | TBD | TBD | TBD | TBD | TBD |
 
-- [ ] **Cost Routing 单独 ablation** —— Triage 用 Sonnet vs Haiku 的 $/ticket 对比 + auto-resolve 是否掉
-- [ ] **Failure Mode 报告** —— 在每个 variant 下找 1-2 个 worst-case ticket，写"为什么这个 variant 在这条上挂掉" → 这是 senior judgment 信号
+- [x] **Cost Routing 单独 ablation** —— variant `D` vs `D_triage_vertical`（`--cost-routing`）：同 token、按 tier 计价对比 $/ticket + auto-resolve 是否掉（`build_cost_routing_table`）
+- [x] **Failure Mode 报告** —— 每个 variant 取 1-2 个 worst-case（judge 分最低 / errored）+ 原因（`build_failure_modes`，已渲染进 `.md`）
 
 ### 7.4 验收
 
+> 验收需在目标硬件/模型上跑全量 `uv run python scripts/eval_architecture.py --variants A,B,C,D --cost-routing` 后填表（本机 9B Ollama 下 plan-execute 单条耗时长，建议调大 `--case-timeout` 或换更快模型）。Harness、judge、scoring、tracing 已端到端验证（technical 单条实跑：token/cost/latency/agent_path/tool_calls/judge 全字段产出）。
+
 - [ ] D 在**至少 3 个指标**上显著优于 A / B / C（不显著的指标也要诚实写在 blog 里 —— "这个维度 multi-agent 没收益，trade-off 在这")
 - [ ] 简历 bullet 的所有数字（"~60% token reduction" 等）能被这张表 back up
-- [ ] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"*
+- [x] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* —— `docs/blog/multi-agent-tradeoffs.md`（方法论完成，表格待全量数字）
+
+详细技术方案见 [`docs/milestone-7-plan.md`](milestone-7-plan.md)。
 
 ## Milestone 8 · Chaos Demo & 视频 artifact（2 days）⭐
 
@@ -176,20 +182,3 @@
 - [ ] Postgres row-level security
 - [ ] tenant_id 列贯穿所有表
 - [ ] /admin UI 配置 OAuth + RBAC
-
----
-
-## 时间预算（6-8 周节奏）
-
-| 周 | 重点 Milestone | 关键产出 |
-|---|---|---|
-| W1 | M1-M2 | 一条端到端 ticket 真跑通 |
-| W2 | M3-M4 | 5 SaaS + 4 层 guardrails 真跑 |
-| W3 | **M5（Adversarial Eval Harness）** ⭐ | Attribution 表 + Ablation 表 + Blog 1 草稿 |
-| W4 | M6-M7 上半 | Hybrid retrieval + benchmark 数据集 |
-| W5 | **M7（Architecture Ablation）** ⭐ | 主表 + Blog 2 草稿 |
-| W6 | **M8（Demo 视频）** ⭐ | 3 分钟视频 + 简历润色 |
-| W7-8 | Buffer + 1 个独家 insight + Blog 发出去 | 进面试 |
-
-> **如果时间紧到只能砍**：M5 + M7 + M8 是不可砍的 ⭐ — 这三个里程碑是 top 30% → top 3% 的全部 leverage。
-> **可以砍**：M3 砍到只做 2-3 个 SaaS（Stripe / Zendesk 必留）；M6 hybrid retrieval 简化为只做 dense；M9 直接放掉。

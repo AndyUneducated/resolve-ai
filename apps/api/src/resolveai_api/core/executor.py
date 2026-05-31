@@ -78,8 +78,30 @@ class Executor:
         capability = self._capability(tool)
         audit = capability == "destructive"
 
-        async with self.sandbox.scope(tool=full) as scope:
-            output = await tool.ainvoke(args)
+        from resolveai_api.core.usage import looks_like_error, record_tool_call
+
+        try:
+            async with self.sandbox.scope(tool=full) as scope:
+                output = await tool.ainvoke(args)
+        except Exception as exc:
+            # Record the failed call for ablation tool-error accounting, then
+            # re-raise so callers keep their existing error handling.
+            record_tool_call(
+                tool=full,
+                args=args,
+                output=f"{type(exc).__name__}: {exc}",
+                is_error=True,
+                duration_ms=0.0,
+            )
+            raise
+
+        record_tool_call(
+            tool=full,
+            args=args,
+            output=output,
+            is_error=looks_like_error(output),
+            duration_ms=scope.duration_ms,
+        )
 
         if audit:
             # Layer 3 (M4) will cross-check these against output guardrails.

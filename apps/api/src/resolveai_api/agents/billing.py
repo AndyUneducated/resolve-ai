@@ -11,7 +11,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from resolveai_api.agents.base import AgentConfig, BaseAgent
-from resolveai_api.agents.billing_graph import build_billing_subgraph
+from resolveai_api.agents.billing_graph import build_billing_react, build_billing_subgraph
 from resolveai_api.agents.state import GraphState
 
 SYSTEM_PROMPT = """\
@@ -39,18 +39,37 @@ TOOL_WHITELIST = [
 
 
 class BillingAgent(BaseAgent):
-    """Compiles a per-instance Plan-Execute-Replan sub-graph from filtered tools."""
+    """Compiles a per-instance billing sub-graph from filtered tools.
 
-    def __init__(self, **kwargs: Any) -> None:
+    `strategy` selects the reasoning style (variant D = plan_execute, variant C =
+    react); `handoff` selects the payload shape (variant D = structured, variant
+    B = full_transcript).
+    """
+
+    def __init__(
+        self,
+        *,
+        handoff: str = "structured",
+        strategy: str = "plan_execute",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
-        self._subgraph = build_billing_subgraph(
+        builder = build_billing_react if strategy == "react" else build_billing_subgraph
+        self._subgraph = builder(
             tools=self.tools,
             whitelist=self.config.tool_whitelist,
             executor=self.executor,
+            handoff=handoff,
         )
 
     @classmethod
-    def default(cls, **kwargs: Any) -> BillingAgent:
+    def default(
+        cls,
+        *,
+        handoff: str = "structured",
+        strategy: str = "plan_execute",
+        **kwargs: Any,
+    ) -> BillingAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -60,7 +79,7 @@ class BillingAgent(BaseAgent):
             system_prompt=SYSTEM_PROMPT,
             tool_whitelist=list(TOOL_WHITELIST),
         )
-        return cls(config=config, **kwargs)
+        return cls(config=config, handoff=handoff, strategy=strategy, **kwargs)
 
     async def run(self, state: GraphState) -> GraphState:
         sub_input: dict[str, Any] = {

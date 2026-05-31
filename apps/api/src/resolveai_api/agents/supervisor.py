@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator, Callable, MutableSequence
+from dataclasses import dataclass
 from typing import Literal
 
 from langchain_core.messages import BaseMessage, HumanMessage
@@ -38,21 +39,43 @@ from resolveai_api.guardrails.output_filter import OutputGuardrail
 from resolveai_api.mcp.toolbelt import ToolBelt
 
 
-def _build_agents(toolbelt: ToolBelt) -> dict[str, object]:
-    executor = Executor()
+@dataclass(frozen=True)
+class GraphOptions:
+    """Architecture knobs for the multi-agent graph (M7 ablation).
+
+    Defaults are variant D (the production configuration), so existing callers
+    that omit `options` keep the exact same behavior.
+    """
+
+    handoff: Literal["structured", "full_transcript"] = "structured"
+    business_strategy: Literal["plan_execute", "react"] = "plan_execute"
+    triage_tier: Literal["triage", "vertical"] = "triage"
+
+
+def _build_agents(
+    toolbelt: ToolBelt,
+    options: GraphOptions,
+    executor: Executor,
+) -> dict[str, object]:
     return {
-        "triage": TriageAgent.default(tools=[], executor=executor),
+        "triage": TriageAgent.default(
+            tools=[], executor=executor, tier=options.triage_tier
+        ),
         "billing": BillingAgent.default(
             tools=toolbelt.for_agent(BILLING_WHITELIST),
             executor=executor,
+            handoff=options.handoff,
+            strategy=options.business_strategy,
         ),
         "technical": TechnicalAgent.default(
             tools=toolbelt.for_agent(TECHNICAL_WHITELIST),
             executor=executor,
+            handoff=options.handoff,
         ),
         "escalation": EscalationAgent.default(
             tools=toolbelt.for_agent(ESCALATION_WHITELIST),
             executor=executor,
+            handoff=options.handoff,
         ),
     }
 
@@ -103,12 +126,15 @@ class SupervisorGraph:
         checkpointer: BaseCheckpointSaver,
         toolbelt: ToolBelt | None = None,
         mcp_tools: list[BaseTool] | None = None,
+        options: GraphOptions | None = None,
+        executor: Executor | None = None,
     ) -> None:
         if toolbelt is None:
             toolbelt = ToolBelt(mcp_tools or [])
         self.checkpointer = checkpointer
         self.toolbelt = toolbelt
-        self.agents = _build_agents(toolbelt)
+        self.options = options or GraphOptions()
+        self.agents = _build_agents(toolbelt, self.options, executor or Executor())
         self.input_guard = InputGuardrail()
         self.output_guard = OutputGuardrail()
         self.graph = self._build_graph()

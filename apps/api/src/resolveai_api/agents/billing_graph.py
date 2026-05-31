@@ -17,7 +17,13 @@ import json
 import logging
 from typing import Annotated, Any, Literal, TypedDict, cast
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import BaseTool
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -30,6 +36,9 @@ logger = logging.getLogger(__name__)
 
 MAX_STEPS = 6
 """Hard cap on (executor + replanner) iterations to bound runaway LLM loops."""
+
+Handoff = str
+"""`structured` (compact TicketSummary JSON) | `full_transcript` (raw messages)."""
 
 
 class Plan(BaseModel):
@@ -105,7 +114,24 @@ Hard rules:
 """
 
 
-def _ticket_brief(state: BillingState) -> str:
+def _msg_text(msg: BaseMessage | dict | object) -> str:
+    content = getattr(msg, "content", None)
+    if content is None and isinstance(msg, dict):
+        content = msg.get("content")
+    return content if isinstance(content, str) else str(content or "")
+
+
+def _ticket_brief(state: BillingState, handoff: Handoff = "structured") -> str:
+    """Handoff payload for the billing LLM.
+
+    `structured` (variant D) passes the compact TicketSummary; `full_transcript`
+    (variant B) replays every message so we can measure the token cost of NOT
+    summarizing at handoff time.
+    """
+    if handoff == "full_transcript":
+        msgs = state.get("messages") or []
+        transcript = "\n".join(_msg_text(m) for m in msgs if _msg_text(m))
+        return transcript or json.dumps(state.get("ticket_summary") or {}, default=str)
     summary = state.get("ticket_summary") or {}
     return json.dumps(summary, default=str)
 
@@ -116,9 +142,9 @@ def _format_past_steps(past: list[tuple[str, str]]) -> str:
     return "\n".join(f"{i + 1}. {s} → {o}" for i, (s, o) in enumerate(past))
 
 
-def _build_planner_node():
+def _build_planner_node(handoff: Handoff = "structured"):
     async def planner(state: BillingState) -> BillingState:
-        ticket = _ticket_brief(state)
+        ticket = _ticket_brief(state, handoff)
         llm = make_structured_llm("vertical", Plan)
         plan: Plan = cast(
             Plan,
@@ -201,9 +227,9 @@ def _build_executor_node(tools: list[BaseTool], executor: Executor, whitelist: l
     return executor_node
 
 
-def _build_replanner_node():
+def _build_replanner_node(handoff: Handoff = "structured"):
     async def replanner(state: BillingState) -> BillingState:
-        ticket = _ticket_brief(state)
+        ticket = _ticket_brief(state, handoff)
         past = _format_past_steps(state.get("past_steps") or [])
         remaining = state.get("plan") or []
         llm = make_structured_llm("vertical", Replan)
@@ -253,11 +279,100 @@ def _route_after_replanner(state: BillingState) -> Decision:
     return "execute" if (state.get("plan") or []) else "done"
 
 
+REACT_SYSTEM = """\
+You are a billing customer-support agent operating in a single-step ReAct loop
+(NO up-front plan): look at the ticket, optionally call ONE or more tools, observe
+results, then either call more tools or give a final answer.
+
+Hard rules:
+- ALL monetary values must be cross-checked against tool return values.
+- NEVER fabricate charge_id / refund amount; never promise a refund beyond the charge.
+- If a single charge >= $500 OR fraud is suspected, stop and say you are escalating.
+When you are done, reply with the final customer-facing answer and no tool calls.
+"""
+
+
+def build_billing_react(
+    *,
+    tools: list[BaseTool],
+    whitelist: list[str],
+    executor: Executor | None = None,
+    handoff: Handoff = "structured",
+):
+    """Compile a single-node ReAct billing agent (variant C ablation).
+
+    Same tools + capability gate as the Plan-Execute graph, but the model
+    improvises one step at a time instead of committing to a multi-step plan.
+    Emits the same `response` / `past_steps` keys so `BillingAgent.run` is
+    strategy-agnostic.
+    """
+    executor = executor or Executor()
+    tool_index = {t.name: t for t in tools}
+    llm = make_llm("vertical").bind_tools(tools) if tools else make_llm("vertical")
+
+    async def agent_node(state: BillingState) -> BillingState:
+        brief = _ticket_brief(state, handoff)
+        convo: list[BaseMessage] = [
+            SystemMessage(content=REACT_SYSTEM),
+            HumanMessage(content=f"Ticket:\n{brief}\n\nResolve it."),
+        ]
+        past_steps: list[tuple[str, str]] = []
+        for _ in range(MAX_STEPS):
+            ai = await llm.ainvoke(convo)
+            if not isinstance(ai, AIMessage):
+                ai = AIMessage(content=str(ai))
+            tool_calls = getattr(ai, "tool_calls", []) or []
+            if not tool_calls:
+                final = ai.content if isinstance(ai.content, str) else str(ai.content)
+                escalate = "escalat" in final.lower()
+                return {
+                    **state,
+                    "response": Response(
+                        final_answer=final.strip() or "Resolved.", escalate=escalate
+                    ),
+                    "past_steps": past_steps,
+                }
+            convo.append(ai)
+            for tool_call in tool_calls:
+                tname = tool_call["name"]
+                targs = tool_call.get("args") or {}
+                tool = tool_index.get(tname)
+                if tool is None:
+                    obs = f"unknown_tool:{tname}"
+                else:
+                    try:
+                        result = await executor.call_tool(
+                            tool=tool, args=targs, whitelist=whitelist
+                        )
+                        obs = str(result.output)
+                    except Exception as exc:  # capability gate / tool error
+                        obs = f"error: {exc}"
+                past_steps.append((tname, obs))
+                convo.append(
+                    ToolMessage(content=obs, tool_call_id=tool_call.get("id", tname))
+                )
+        return {
+            **state,
+            "response": Response(
+                final_answer="Reached the step budget without resolving; escalating.",
+                escalate=True,
+            ),
+            "past_steps": past_steps,
+        }
+
+    builder: StateGraph = StateGraph(BillingState)
+    builder.add_node("agent", agent_node)
+    builder.set_entry_point("agent")
+    builder.add_edge("agent", END)
+    return builder.compile()
+
+
 def build_billing_subgraph(
     *,
     tools: list[BaseTool],
     whitelist: list[str],
     executor: Executor | None = None,
+    handoff: Handoff = "structured",
 ):
     """Compile the planner/executor/replanner sub-graph (no checkpointer here).
 
@@ -267,9 +382,9 @@ def build_billing_subgraph(
     executor = executor or Executor()
 
     builder: StateGraph = StateGraph(BillingState)
-    builder.add_node("planner", _build_planner_node())
+    builder.add_node("planner", _build_planner_node(handoff))
     builder.add_node("executor", _build_executor_node(tools, executor, whitelist))
-    builder.add_node("replanner", _build_replanner_node())
+    builder.add_node("replanner", _build_replanner_node(handoff))
 
     builder.set_entry_point("planner")
     builder.add_edge("planner", "executor")
