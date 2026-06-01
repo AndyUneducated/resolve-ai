@@ -25,6 +25,8 @@ if str(ROOT / "apps" / "api" / "src") not in sys.path:
 
 from resolveai_api.config import get_settings  # noqa: E402
 from resolveai_api.core.db import tenant_session  # noqa: E402
+from resolveai_api.eval.preflight import DEGRADED_NOTE, check_database  # noqa: E402
+from resolveai_api.eval.run_meta import build_run_meta  # noqa: E402
 from resolveai_api.retrieval.hybrid import HybridRetriever  # noqa: E402
 from resolveai_api.retrieval.metrics import (  # noqa: E402
     aggregate,
@@ -69,6 +71,7 @@ async def eval_profile(
 ) -> dict[str, Any]:
     get_settings.cache_clear()
     retriever = HybridRetriever(profile=profile)
+    reranker_status = retriever.reranker_status
     per_case: list[dict[str, float]] = []
     details: list[dict[str, Any]] = []
 
@@ -98,7 +101,12 @@ async def eval_profile(
             }
         )
 
-    return {"profile": profile, "aggregate": aggregate(per_case), "cases": details}
+    return {
+        "profile": profile,
+        "reranker_status": reranker_status,
+        "aggregate": aggregate(per_case),
+        "cases": details,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -110,28 +118,83 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _ts() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
 async def run() -> int:
+    started_at = _ts()
     args = parse_args()
     tenant_id = args.tenant or get_settings().default_tenant_id
     golden = _load_golden(args.golden)
     profiles = [p.strip() for p in args.profiles.split(",") if p.strip()]
 
+    preflight = await check_database(tenant_id)
+
     results = []
+    degraded_paths: list[dict[str, str]] = []
     for profile in profiles:
         result = await eval_profile(
             profile=profile, golden=golden, tenant_id=tenant_id, k=args.k
         )
         results.append(result)
         agg = result["aggregate"]
-        print(f"[retrieval-eval] profile={profile} " + " ".join(
-            f"{key}={value:.3f}" for key, value in agg.items()
-        ))
+        status = result["reranker_status"]
+        if status == "fallback(rrf)":
+            degraded_paths.append(
+                {
+                    "profile": profile,
+                    "component": "reranker",
+                    "status": status,
+                    "remedy": "uv sync --extra rerank",
+                }
+            )
+            print(
+                "[retrieval-eval] WARNING reranker fell back to RRF order "
+                "(cross-encoder not loaded). Install with `uv sync --extra rerank` "
+                "to evaluate the real rerank path."
+            )
+        print(
+            f"[retrieval-eval] profile={profile} reranker={status} "
+            + " ".join(f"{key}={value:.3f}" for key, value in agg.items())
+        )
+
+    if degraded_paths:
+        print(f"[retrieval-eval] degraded paths: {len(degraded_paths)} (see report)")
+        print(f"[retrieval-eval] {DEGRADED_NOTE.lstrip('> ')}")
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     out = REPORTS_DIR / f"retrieval_eval_{ts}.json"
-    out.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    report = {
+        "degraded_paths": degraded_paths,
+        "degraded_note": DEGRADED_NOTE,
+        "results": results,
+    }
+    out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    manifest_path = out.with_suffix(".manifest.json")
+    meta = build_run_meta(
+        argv=sys.argv[1:],
+        started_at=started_at,
+        finished_at=_ts(),
+        fixtures={"kb_retrieval_golden": args.golden},
+        artifacts={"report_json": str(out)},
+        extra={
+            "harness": "eval_retrieval",
+            "profiles": profiles,
+            "k": args.k,
+            "tenant_id": tenant_id,
+            "preflight": preflight,
+            "degraded_paths": degraded_paths,
+        },
+    )
+    manifest_path.write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
     print(f"[retrieval-eval] report → {out}")
+    print(f"[retrieval-eval] run manifest → {manifest_path}")
     return 0
 
 

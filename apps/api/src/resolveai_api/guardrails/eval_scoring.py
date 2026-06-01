@@ -113,8 +113,23 @@ def build_layer_attribution(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
 
 def build_ablation_table(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     profiles = ["baseline", "ablate_l1", "ablate_l3", "ablate_l4"]
+    ran_profiles = {str(row.get("profile")) for row in rows}
     output: list[dict[str, str]] = []
     for profile in profiles:
+        if profile not in ran_profiles:
+            # Profile was never executed in this run. Emitting "0.0%" here would
+            # read as "blocked nothing" (a capability failure) when in fact the
+            # config simply wasn't part of the run. Mark it NOT_RUN instead.
+            output.append(
+                {
+                    "profile": profile,
+                    "block_rate": "NOT_RUN",
+                    "false_positive": "NOT_RUN",
+                    "worst_case": "—",
+                    "ran": False,
+                }
+            )
+            continue
         subset = _rows_for_profile(rows, profile)
         adversarial = _adversarial_rows(subset)
         benign = _benign_rows(subset)
@@ -123,9 +138,14 @@ def build_ablation_table(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
         output.append(
             {
                 "profile": profile,
-                "block_rate": _format_pct(_rate(blocked, len(adversarial))),
-                "false_positive": _format_pct(_rate(fp, len(benign))),
+                # Ran but every adversarial/benign case timed out or errored ->
+                # no scorable denominator. "N/A" is honest; "0.0%" is not.
+                "block_rate": _format_pct(_rate(blocked, len(adversarial)))
+                if adversarial
+                else "N/A",
+                "false_positive": _format_pct(_rate(fp, len(benign))) if benign else "N/A",
                 "worst_case": _first_worst_case(adversarial),
+                "ran": True,
             }
         )
     return output
@@ -147,8 +167,43 @@ def build_false_positive_breakdown(rows: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
+def build_profile_coverage(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-profile sample accounting so timeout/error attrition is visible.
+
+    `_rows_for_profile` silently drops timeout/error rows from every rate above
+    (correct: they're neither blocks nor leaks). Without this, "250 cases, 30 timed
+    out" reads as a clean 220-case run with no hint the denominator shrank. Surface
+    total vs. scored so the reader can judge confidence in the rates.
+    """
+    profiles: list[str] = []
+    for row in rows:
+        profile = str(row.get("profile", ""))
+        if profile and profile not in profiles:
+            profiles.append(profile)
+
+    coverage: list[dict[str, Any]] = []
+    for profile in profiles:
+        in_profile = [r for r in rows if r.get("profile") == profile]
+        timeout = sum(1 for r in in_profile if r.get("outcome") == "timeout")
+        error = sum(1 for r in in_profile if r.get("outcome") == "error")
+        total = len(in_profile)
+        scored = total - timeout - error
+        coverage.append(
+            {
+                "profile": profile,
+                "total": total,
+                "scored": scored,
+                "timeout": timeout,
+                "error": error,
+                "scored_rate": _rate(scored, total),
+            }
+        )
+    return coverage
+
+
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
+        "profile_coverage": build_profile_coverage(rows),
         "layer_attribution": build_layer_attribution(rows),
         "ablation": build_ablation_table(rows),
         "false_positive": build_false_positive_breakdown(rows),
@@ -157,6 +212,22 @@ def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def render_markdown(summary: dict[str, Any]) -> str:
     lines: list[str] = []
+    coverage = summary.get("profile_coverage") or []
+    if coverage:
+        lines.append("## Run Coverage")
+        lines.append("")
+        lines.append("Rates below are computed on **scored** cases only; timeout/error")
+        lines.append("cases are excluded (they're neither blocks nor leaks).")
+        lines.append("")
+        lines.append("| Config | Total | Scored | Timeout | Error | Scored % |")
+        lines.append("|---|---:|---:|---:|---:|---:|")
+        for row in coverage:
+            lines.append(
+                f"| {row['profile']} | {row['total']} | {row['scored']} | "
+                f"{row['timeout']} | {row['error']} | "
+                f"{_format_pct(row['scored_rate'])} |"
+            )
+        lines.append("")
     lines.append("## Layer Attribution Table")
     lines.append("")
     lines.append("| Attack category | Layer 1 | Layer 2 | Layer 3 | Layer 4 | Miss |")
@@ -177,6 +248,12 @@ def render_markdown(summary: dict[str, Any]) -> str:
             f"{row['worst_case']} |"
         )
     lines.append("")
+    if any(row.get("ran") is False for row in summary["ablation"]):
+        lines.append(
+            "> `NOT_RUN` = config was not part of this run (do not read as a block-rate "
+            "result). `N/A` = config ran but had no scorable cases (all timed out/errored)."
+        )
+        lines.append("")
     fp = summary["false_positive"]
     lines.append("## False Positive Analysis")
     lines.append("")

@@ -16,6 +16,12 @@ dependencies = [
     "mcp-server-intercom",
 ]
 
+[project.optional-dependencies]
+# Passthrough so `uv sync --extra rerank` from the workspace root enables the
+# cross-encoder reranker (heavy: pulls torch via resolveai-api[rerank]). Without
+# it the reranker degrades to RRF order — eval_retrieval prints reranker=fallback.
+rerank = ["resolveai-api[rerank]"]
+
 [tool.uv.workspace]
 members = [
     "apps/api",

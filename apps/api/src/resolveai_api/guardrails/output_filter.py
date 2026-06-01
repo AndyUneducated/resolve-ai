@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from resolveai_api.config import get_settings
 from resolveai_api.core.llm import make_structured_llm
 from resolveai_api.guardrails.attribution import flag_enabled
-from resolveai_api.guardrails.presidio import get_presidio
+from resolveai_api.guardrails.presidio import drop_ignored_entities, get_presidio
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,9 @@ class OutputGuardrail:
 
         try:
             bundle = get_presidio()
-            results = bundle.analyzer.analyze(text=text, language=self._language)
+            results = drop_ignored_entities(
+                bundle.analyzer.analyze(text=text, language=self._language)
+            )
             if results:
                 scrubbed = bundle.anonymizer.anonymize(
                     text=text, analyzer_results=results

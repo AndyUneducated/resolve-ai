@@ -1,5 +1,9 @@
-.PHONY: help install dev api web seed test red-team lint fmt typecheck clean \
+.PHONY: help install dev api web seed db-migrate test red-team lint fmt typecheck clean \
 	chaos regression-gate demo-assets demo-record obs
+
+# Owner/superuser DSN for DDL (RLS migration). resolveai_app lacks DDL rights, so
+# this must run as the owner. Override for a remote/CI DB: make db-migrate MIGRATE_DSN=...
+MIGRATE_DSN ?= postgresql://resolveai:resolveai@localhost:5432/resolveai
 
 help:
 	@echo "Targets:"
@@ -8,6 +12,7 @@ help:
 	@echo "  api             仅启动 FastAPI 后端"
 	@echo "  web             仅启动 Next.js 前端"
 	@echo "  seed            初始化 Postgres + 灌入 FAQ / 演示 ticket"
+	@echo "  db-migrate      对已存在的库应用 RLS 迁移（新容器已自动烧入；存量 volume 用这个）"
 	@echo "  test            跑 pytest + frontend lint"
 	@echo "  red-team        跑 200 个 adversarial prompt"
 	@echo "  chaos           5K mock ticket 并发压测（M8，默认 fake backend）"
@@ -37,6 +42,12 @@ web:
 
 seed:
 	uv run python scripts/seed_db.py
+
+db-migrate:
+	# Idempotent (DROP POLICY IF EXISTS + CREATE; ENABLE/FORCE re-runnable). Fresh
+	# `docker compose up` already applies this via 02-rls.sql; use this for a volume
+	# created before RLS existed, then ensure APP_DATABASE_URL points at resolveai_app.
+	psql "$(MIGRATE_DSN)" -f infra/docker/migrations/0001_rls.sql
 
 test:
 	uv run python -m pytest -q

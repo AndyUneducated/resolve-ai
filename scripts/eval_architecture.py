@@ -22,6 +22,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 import time
 from collections.abc import Callable
 from contextlib import AsyncExitStack
@@ -29,13 +30,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import httpx
 from resolveai_api.config import get_settings
 from resolveai_api.core.checkpointer import lifespan_checkpointer
 from resolveai_api.core.executor import Executor
 from resolveai_api.eval.arch_scoring import build_summary, load_jsonl, render_markdown
 from resolveai_api.eval.judge import ResolutionJudge
+from resolveai_api.eval.preflight import check_ollama
 from resolveai_api.eval.pricing import trace_cost_usd
+from resolveai_api.eval.run_meta import build_run_meta
 from resolveai_api.eval.trace import capture_run, classify_tool_errors
 from resolveai_api.eval.variants import (
     ABLATION_KEYS,
@@ -48,6 +50,10 @@ from resolveai_api.mcp.toolbelt import ToolBelt
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BENCHMARK = ROOT / "apps" / "api" / "tests" / "fixtures" / "benchmark_tickets.jsonl"
 REPORTS_DIR = ROOT / "reports"
+
+
+def _ts() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 # Variants need the full SaaS surface (variant A sees every tool); enable all 5
 # MCP servers for the eval unless the environment already configured them.
@@ -86,7 +92,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run only 3 tickets per category for fast smoke checks.",
     )
-    parser.add_argument("--case-timeout", type=float, default=180.0)
+    parser.add_argument(
+        "--case-timeout",
+        type=float,
+        default=180.0,
+        help=(
+            "Per-case wall-clock timeout in seconds. 180s fits a local ~9B; for a "
+            "27B + Plan-Execute raise to ~600 (single cases can be slow). Use --quick "
+            "/ --limit for fast smoke runs."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -132,19 +147,8 @@ def _apply_env() -> None:
     get_settings.cache_clear()
 
 
-async def _check_prereqs() -> None:
-    settings = get_settings()
-    if settings.llm_backend != "ollama":
-        return
-    url = settings.ollama_base_url.rstrip("/") + "/api/tags"
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-    except Exception as exc:  # pragma: no cover - env dependent
-        raise RuntimeError(
-            f"Ollama is unreachable at {settings.ollama_base_url}. Start Ollama first."
-        ) from exc
+async def _check_prereqs() -> dict[str, Any]:
+    return await check_ollama()
 
 
 def _tool_summary(tool_names: list[str]) -> str:
@@ -263,11 +267,24 @@ async def _run_variant(
         )
         rows: list[dict[str, Any]] = []
         for ticket in cases:
+            ticket_id = str(ticket.get("id", "unknown"))
+            print(
+                f"[arch] case_start variant={variant_key} id={ticket_id} "
+                f"category={ticket.get('category')} ts={_ts()}",
+                flush=True,
+            )
             row = await _eval_ticket(
                 runner=runner,
                 ticket=ticket,
                 judge=judge,
                 case_timeout_s=case_timeout_s,
+            )
+            last_node = (row.get("agent_path") or [None])[-1]
+            print(
+                f"[arch] case_end   variant={variant_key} id={ticket_id} "
+                f"outcome={row.get('outcome')} elapsed_ms={row.get('latency_ms')} "
+                f"resolved={row.get('resolved')} last_node={last_node}",
+                flush=True,
             )
             on_row(row)
             rows.append(row)
@@ -285,9 +302,10 @@ def _report_paths() -> tuple[Path, Path, Path]:
 
 
 async def run() -> int:
+    started_at = _ts()
     args = parse_args()
     _apply_env()
-    await _check_prereqs()
+    preflight = await _check_prereqs()
 
     variants = _parse_variants(args.variants, args.cost_routing)
     categories = _parse_categories(args.categories)
@@ -321,15 +339,39 @@ async def run() -> int:
                 f"resolved={resolved} errored={errors}"
             )
 
-    summary = build_summary(all_rows)
+    summary = build_summary(all_rows, requested_variants=variants)
     with json_path.open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2, ensure_ascii=False)
     with md_path.open("w", encoding="utf-8") as handle:
         handle.write(render_markdown(summary))
 
+    manifest_path = json_path.with_suffix(".manifest.json")
+    meta = build_run_meta(
+        argv=sys.argv[1:],
+        started_at=started_at,
+        finished_at=_ts(),
+        fixtures={"benchmark": args.benchmark},
+        artifacts={
+            "raw_rows": str(jsonl_path),
+            "summary_json": str(json_path),
+            "summary_md": str(md_path),
+        },
+        extra={
+            "harness": "eval_architecture",
+            "variants": variants,
+            "categories": sorted(categories),
+            "case_count": len(cases),
+            "case_timeout_s": args.case_timeout,
+            "preflight": preflight,
+        },
+    )
+    with manifest_path.open("w", encoding="utf-8") as handle:
+        json.dump(meta, handle, indent=2, ensure_ascii=False)
+
     print(f"[arch] raw rows:     {jsonl_path}")
     print(f"[arch] summary json: {json_path}")
     print(f"[arch] summary md:   {md_path}")
+    print(f"[arch] run manifest: {manifest_path}")
     return 0
 
 

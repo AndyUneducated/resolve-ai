@@ -87,6 +87,11 @@ class HybridRetriever:
         self._candidate_k = candidate_k or settings.retrieval_candidate_k
         self._rrf_k = rrf_k or settings.retrieval_rrf_k
 
+    @property
+    def reranker_status(self) -> str:
+        """Effective reranker state: 'disabled' | 'active' | 'fallback(rrf)'."""
+        return self._reranker.availability()
+
     def _get_embedder(self) -> Embeddings:
         if self._embedder is None:
             from resolveai_api.retrieval.embedder import get_embedder

@@ -15,6 +15,23 @@ from langgraph.checkpoint.memory import MemorySaver
 from resolveai_api.agents.billing_graph import Plan, Replan, Response
 from resolveai_api.agents.supervisor import SupervisorGraph
 from resolveai_api.agents.triage import TriageOutput
+from resolveai_api.config import get_settings
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_guardrails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin guardrails off for this hermetic e2e regardless of ambient env.
+
+    These tests mock the LLM layer but not the guardrails; if an outer process
+    (e.g. a live-eval script) exported GUARDRAIL_L3=on, the real output guardrail
+    would run on the canned mock reply and flip the final event from `done` to
+    `blocked`. Setting them explicitly here makes the test self-contained.
+    """
+    for layer in ("GUARDRAIL_L1", "GUARDRAIL_L2", "GUARDRAIL_L3", "GUARDRAIL_L4"):
+        monkeypatch.setenv(layer, "off")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 class _Queue:

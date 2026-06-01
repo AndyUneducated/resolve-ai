@@ -42,6 +42,17 @@ class Reranker:
             self._unavailable = True
         return self._model
 
+    def availability(self) -> str:
+        """Report effective status: 'disabled' | 'active' | 'fallback(rrf)'.
+
+        Triggers a (cached) load attempt so callers can surface the *real* state
+        instead of assuming the configured cross-encoder is in effect. Lets eval /
+        startup make silent degradation (missing `--extra rerank`) visible.
+        """
+        if not self._enabled:
+            return "disabled"
+        return "active" if self._load() is not None else "fallback(rrf)"
+
     def _score(self, query: str, docs: list[RetrievedDoc]) -> list[float]:
         model = self._model
         assert model is not None  # guarded by caller

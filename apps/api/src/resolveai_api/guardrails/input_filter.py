@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from resolveai_api.config import get_settings
 from resolveai_api.guardrails.attribution import flag_enabled
-from resolveai_api.guardrails.presidio import get_presidio
+from resolveai_api.guardrails.presidio import drop_ignored_entities, get_presidio
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,9 @@ class InputGuardrail:
 
     def _scrub(self, text: str) -> tuple[str, list[str]]:
         bundle = get_presidio()
-        results = bundle.analyzer.analyze(text=text, language=self._language)
+        results = drop_ignored_entities(
+            bundle.analyzer.analyze(text=text, language=self._language)
+        )
         if not results:
             return text, []
         anonymized = bundle.anonymizer.anonymize(text=text, analyzer_results=results)

@@ -5,7 +5,11 @@ from typing import Any
 
 import pytest
 from resolveai_api.core.checkpointer import CrossTenantAccessBlocked, IsolatedCheckpointer
-from resolveai_api.guardrails.eval_scoring import build_summary
+from resolveai_api.guardrails.eval_scoring import (
+    build_profile_coverage,
+    build_summary,
+    render_markdown,
+)
 
 
 @dataclass
@@ -89,6 +93,41 @@ def test_eval_scoring_builds_expected_tables() -> None:
     fp = summary["false_positive"]
     assert fp["blocked_benign"] == 1
     assert fp["reasons"]["policy:unauthorized_concession"] == 1
+
+
+def test_profile_coverage_accounts_for_timeout_and_error() -> None:
+    rows = [
+        _mk_row(row_id="jb-1", category="jailbreak", profile="baseline", blocked=True),
+        _mk_row(row_id="jb-2", category="jailbreak", profile="baseline", blocked=False),
+        {"id": "jb-3", "category": "jailbreak", "profile": "baseline", "outcome": "timeout"},
+        {"id": "jb-4", "category": "jailbreak", "profile": "baseline", "outcome": "error"},
+        _mk_row(row_id="jb-5", category="jailbreak", profile="l1_only", blocked=True),
+    ]
+    coverage = {row["profile"]: row for row in build_profile_coverage(rows)}
+
+    base = coverage["baseline"]
+    assert base["total"] == 4
+    assert base["scored"] == 2
+    assert base["timeout"] == 1
+    assert base["error"] == 1
+    assert base["scored_rate"] == 0.5
+
+    # A profile with no failures should be 100% scored.
+    assert coverage["l1_only"]["scored"] == 1
+    assert coverage["l1_only"]["scored_rate"] == 1.0
+
+
+def test_profile_coverage_surfaced_in_summary_and_markdown() -> None:
+    rows = [
+        _mk_row(row_id="jb-1", category="jailbreak", profile="baseline", blocked=True),
+        {"id": "jb-2", "category": "jailbreak", "profile": "baseline", "outcome": "timeout"},
+    ]
+    summary = build_summary(rows)
+    assert "profile_coverage" in summary
+    md = render_markdown(summary)
+    # Denominator attrition must be visible to the reader, not silently dropped.
+    assert "Run Coverage" in md
+    assert "Timeout" in md
 
 
 @pytest.mark.asyncio

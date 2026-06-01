@@ -11,6 +11,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # RLS migration runs after 01-init (alphabetical order), once tables exist:
+      # enables/forces row-level security + creates the low-privilege resolveai_app
+      # role so a fresh container has RLS actually enforced (dev == prod shape).
+      - ./infra/docker/migrations/0001_rls.sql:/docker-entrypoint-initdb.d/02-rls.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U resolveai"]
       interval: 5s

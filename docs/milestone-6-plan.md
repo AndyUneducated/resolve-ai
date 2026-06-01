@@ -91,8 +91,12 @@ uv run python scripts/eval_retrieval.py --profiles hybrid,dense_only --k 5
 启用 reranker（可选，会拉 torch）：
 
 ```bash
-uv sync --extra rerank   # in apps/api
+uv sync --extra rerank   # 从 workspace 根即可（root extra 透传到 resolveai-api[rerank]）
 ```
+
+未安装时 reranker 自动降级为 RRF 融合排序。`scripts/eval_retrieval.py` 现在会显式打印
+`reranker=active|fallback(rrf)|disabled`，降级时额外给一条 WARNING，避免「以为在评精排、
+其实评的是融合顺序」。
 
 ---
 

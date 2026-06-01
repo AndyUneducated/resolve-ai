@@ -88,8 +88,28 @@ class Settings(BaseSettings):
     llama_guard_timeout_ms: int = Field(default=2000, alias="LLAMA_GUARD_TIMEOUT_MS")
     presidio_endpoint: str = Field(default="", alias="PRESIDIO_ENDPOINT")
     presidio_language: str = Field(default="en", alias="PRESIDIO_LANGUAGE")
+    presidio_ignored_entities: str = Field(
+        default="DATE_TIME", alias="PRESIDIO_IGNORED_ENTITIES"
+    )
+    """Comma-separated Presidio entity types to NOT treat as PII (redaction scope only).
+
+    `DATE_TIME` fires on benign phrases like "yesterday" / "last month", producing
+    noisy `pii:date_time` flags that aren't blocking and aren't sensitive. Excluding
+    them cuts noise without changing any blocking decision. Set to "" to redact all
+    detected entity types."""
     policy_judge_model: str = Field(default="qwen3.5:9b", alias="POLICY_JUDGE_MODEL")
-    policy_judge_timeout_ms: int = Field(default=1500, alias="POLICY_JUDGE_TIMEOUT_MS")
+    # Local Ollama judges (esp. a 27B vertical model) routinely exceed 1.5s; that
+    # default produced near-constant policy_judge_timeout flags during live eval.
+    # Keep the budget generous for local; lower only against a fast hosted endpoint.
+    policy_judge_timeout_ms: int = Field(default=8000, alias="POLICY_JUDGE_TIMEOUT_MS")
+
+    @property
+    def presidio_ignored_entities_set(self) -> set[str]:
+        return {
+            e.strip().upper()
+            for e in self.presidio_ignored_entities.split(",")
+            if e.strip()
+        }
     gvisor_runtime: str = Field(default="runsc", alias="GVISOR_RUNTIME")
     guardrail_l1: str = Field(default="on", alias="GUARDRAIL_L1")
     guardrail_l2: str = Field(default="on", alias="GUARDRAIL_L2")

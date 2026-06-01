@@ -2805,6 +2805,11 @@ dependencies = [
     { name = "resolveai-api" },
 ]
 
+[package.optional-dependencies]
+rerank = [
+    { name = "resolveai-api", extra = ["rerank"] },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
@@ -2823,7 +2828,9 @@ requires-dist = [
     { name = "mcp-server-stripe", editable = "packages/mcp-servers/stripe" },
     { name = "mcp-server-zendesk", editable = "packages/mcp-servers/zendesk" },
     { name = "resolveai-api", editable = "apps/api" },
+    { name = "resolveai-api", extras = ["rerank"], marker = "extra == 'rerank'", editable = "apps/api" },
 ]
+provides-extras = ["rerank"]
 
 [package.metadata.requires-dev]
 dev = [

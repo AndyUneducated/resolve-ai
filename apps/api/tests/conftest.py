@@ -10,10 +10,17 @@ os.environ.setdefault("CHECKPOINT_BACKEND", "memory")
 os.environ.setdefault("LLM_BACKEND", "ollama")
 os.environ.setdefault("DEFAULT_TENANT_ID", "demo")
 os.environ.setdefault("SANDBOX_MODE", "off")
-os.environ.setdefault("GUARDRAIL_L1", "off")
-os.environ.setdefault("GUARDRAIL_L2", "off")
-os.environ.setdefault("GUARDRAIL_L3", "off")
-os.environ.setdefault("GUARDRAIL_L4", "on")
+
+# Guardrail toggles are AUTHORITATIVE for the hermetic suite: assign directly
+# (not setdefault) so an ambient `export GUARDRAIL_L3=on` from an outer shell or
+# live-eval script cannot leak in and make mock-LLM tests hit the real output
+# guardrail (which previously turned `done` into `blocked`). Tests that need a
+# specific layer toggled use monkeypatch.setenv + get_settings.cache_clear(),
+# which overrides these at run time and restores afterwards.
+os.environ["GUARDRAIL_L1"] = "off"
+os.environ["GUARDRAIL_L2"] = "off"
+os.environ["GUARDRAIL_L3"] = "off"
+os.environ["GUARDRAIL_L4"] = "on"
 
 import pytest
 from resolveai_api.config import get_settings

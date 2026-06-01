@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 import time
 from collections.abc import Callable
 from contextlib import AsyncExitStack
@@ -13,10 +14,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import httpx
 from resolveai_api.agents.supervisor import SupervisorGraph
 from resolveai_api.config import get_settings
 from resolveai_api.core.checkpointer import lifespan_checkpointer
+from resolveai_api.eval.preflight import check_ollama
+from resolveai_api.eval.run_meta import build_run_meta
 from resolveai_api.guardrails.attribution import (
     GuardrailConfig,
     GuardrailReport,
@@ -36,6 +38,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RED_TEAM = ROOT / "apps" / "api" / "tests" / "fixtures" / "red_team.jsonl"
 DEFAULT_BENIGN = ROOT / "apps" / "api" / "tests" / "fixtures" / "benign_tickets.jsonl"
 REPORTS_DIR = ROOT / "reports"
+
+
+def _ts() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,7 +75,12 @@ def parse_args() -> argparse.Namespace:
         "--case-timeout",
         type=float,
         default=90.0,
-        help="Per-case wall-clock timeout in seconds; exceeding it records a timeout row.",
+        help=(
+            "Per-case wall-clock timeout in seconds; exceeding it records a timeout "
+            "row (excluded from rates, surfaced in Run Coverage). 90s suits a fast "
+            "hosted model or local ~9B; for a local 27B + Plan-Execute raise to ~600 "
+            "(or use --quick / --limit for a smoke run)."
+        ),
     )
     return parser.parse_args()
 
@@ -115,33 +126,12 @@ def _apply_profile(profile: GuardrailConfig) -> None:
     get_settings.cache_clear()
 
 
-async def _check_prereqs() -> None:
+async def _check_prereqs() -> dict[str, Any]:
     settings = get_settings()
     get_presidio()
-    if settings.llm_backend != "ollama":
-        return
-    required_models = {settings.llama_guard_model, settings.policy_judge_model}
-    url = settings.ollama_base_url.rstrip("/") + "/api/tags"
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-    except Exception as exc:  # pragma: no cover - env dependent
-        raise RuntimeError(
-            f"Ollama is unreachable at {settings.ollama_base_url}. "
-            "Start Ollama and pull required models first."
-        ) from exc
-    payload = response.json()
-    models = {
-        str(item.get("name", ""))
-        for item in payload.get("models", [])
-        if isinstance(item, dict)
-    }
-    missing = [model for model in required_models if model not in models]
-    if missing:  # pragma: no cover - env dependent
-        raise RuntimeError(
-            f"Missing Ollama model(s): {missing}. Run `ollama pull <model>` before eval."
-        )
+    return await check_ollama(
+        required_models={settings.llama_guard_model, settings.policy_judge_model}
+    )
 
 
 def _extract_blocked(events: list[dict[str, str]]) -> bool:
@@ -334,11 +324,24 @@ async def _run_profile(
         supervisor = SupervisorGraph(checkpointer=checkpointer, toolbelt=toolbelt)
         rows: list[dict[str, Any]] = []
         for case in cases:
+            case_id = str(case.get("id", "unknown"))
+            print(
+                f"[eval] case_start profile={profile_name} id={case_id} "
+                f"category={case.get('category')} ts={_ts()}",
+                flush=True,
+            )
             row = await _eval_case(
                 supervisor,
                 profile_name=profile_name,
                 case=case,
                 case_timeout_s=case_timeout_s,
+            )
+            last_event = (row.get("event_types") or [None])[-1]
+            print(
+                f"[eval] case_end   profile={profile_name} id={case_id} "
+                f"outcome={row.get('outcome')} elapsed_ms={row.get('latency_ms')} "
+                f"last_event={last_event}",
+                flush=True,
             )
             on_row(row)
             rows.append(row)
@@ -355,6 +358,7 @@ def _report_paths() -> tuple[Path, Path, Path]:
 
 
 async def run() -> int:
+    started_at = _ts()
     args = parse_args()
     configs = _parse_configs(args.configs)
     categories = _parse_categories(args.categories)
@@ -364,6 +368,8 @@ async def run() -> int:
     cases = _select_cases(adversarial + benign, categories=categories, quick=args.quick, limit=args.limit)
     if not cases:
         raise RuntimeError("No cases selected after applying --categories/--limit.")
+
+    preflight = await _check_prereqs()
 
     jsonl_path, json_path, md_path = _report_paths()
     all_rows: list[dict[str, Any]] = []
@@ -396,9 +402,33 @@ async def run() -> int:
     with md_path.open("w", encoding="utf-8") as handle:
         handle.write(render_markdown(summary))
 
+    manifest_path = json_path.with_suffix(".manifest.json")
+    meta = build_run_meta(
+        argv=sys.argv[1:],
+        started_at=started_at,
+        finished_at=_ts(),
+        fixtures={"red_team": args.red_team, "benign": args.benign},
+        artifacts={
+            "raw_rows": str(jsonl_path),
+            "summary_json": str(json_path),
+            "summary_md": str(md_path),
+        },
+        extra={
+            "harness": "eval_adversarial",
+            "configs": configs,
+            "categories": sorted(categories),
+            "case_count": len(cases),
+            "case_timeout_s": args.case_timeout,
+            "preflight": preflight,
+        },
+    )
+    with manifest_path.open("w", encoding="utf-8") as handle:
+        json.dump(meta, handle, indent=2, ensure_ascii=False)
+
     print(f"[eval] raw rows: {jsonl_path}")
     print(f"[eval] summary json: {json_path}")
     print(f"[eval] summary md: {md_path}")
+    print(f"[eval] run manifest: {manifest_path}")
     return 0
 
 

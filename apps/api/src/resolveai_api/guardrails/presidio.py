@@ -38,6 +38,22 @@ def get_presidio() -> PresidioBundle:
     return _bundle
 
 
+def drop_ignored_entities(results: list) -> list:
+    """Filter out entity types configured as non-sensitive (redaction scope only).
+
+    Driven by `settings.presidio_ignored_entities` (default `DATE_TIME`). This only
+    narrows what gets redacted / flagged as PII; it does NOT touch any blocking
+    decision (`pii:*` flags are not in BLOCKING_FLAGS). Keeps benign date mentions
+    like "yesterday" from producing noisy `pii:date_time` flags.
+    """
+    from resolveai_api.config import get_settings
+
+    ignored = get_settings().presidio_ignored_entities_set
+    if not ignored:
+        return results
+    return [r for r in results if str(r.entity_type).upper() not in ignored]
+
+
 def reset_for_tests() -> None:
     """Drop the singleton; tests that swap analyzers can call this."""
     global _bundle

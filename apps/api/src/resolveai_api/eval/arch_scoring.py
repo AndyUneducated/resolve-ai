@@ -142,8 +142,18 @@ def _pct_change(new: float, base: float) -> float | None:
     return (new - base) / base * 100.0
 
 
-def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def build_summary(
+    rows: list[dict[str, Any]],
+    requested_variants: list[str] | None = None,
+) -> dict[str, Any]:
+    present = {r.get("variant") for r in rows}
+    # A requested variant that produced no rows (e.g. aborted before it started)
+    # must be listed explicitly; otherwise it just silently vanishes from the
+    # report and a reader assumes the ablation was complete.
+    not_run = [v for v in (requested_variants or []) if v not in present]
     return {
+        "requested_variants": requested_variants or sorted(v for v in present if v),
+        "not_run_variants": not_run,
         "ablation": build_ablation_table(rows),
         "cost_routing": build_cost_routing_table(rows),
         "failure_modes": build_failure_modes(rows),
@@ -187,6 +197,14 @@ def render_markdown(summary: dict[str, Any]) -> str:
     lines: list[str] = []
     lines.append("## Architecture Ablation Table")
     lines.append("")
+    not_run = summary.get("not_run_variants") or []
+    if not_run:
+        lines.append(
+            "> **Not run this run:** "
+            + ", ".join(f"`{v}`" for v in not_run)
+            + " — requested but produced no rows; excluded from all tables below."
+        )
+        lines.append("")
     lines.append(
         "| Variant | Token/ticket | $/ticket | P95 (s) | Auto-resolve | Tool error |"
     )
