@@ -2,9 +2,9 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 6）。
 
-**Goal:** 交付 hybrid KB retrieval stack（BM25 + dense + RRF + reranker），让 Technical Agent 产出 KB-grounded、citation-verified 的回答 — 同时抽象 M7（architecture ablation）、M8（chaos/demo）、M9（multi-tenant）所依赖的 interfaces、tenant filtering、observability 与 eval hooks。
+**Goal（目标）:** 交付一套混合知识库检索栈（hybrid KB retrieval：BM25 + dense + RRF + reranker），让 Technical Agent 产出「有知识库支撑（KB-grounded）、引用经过校验（citation-verified）」的回答；同时把 M7（架构消融）、M8（混沌压测 / demo）、M9（多租户）所依赖的接口、租户过滤、可观测性与 eval hook 一并抽象出来。
 
-**Design principle:** 调库优先（library-first）。复用 database 与现有 frameworks；项目代码仅为 thin orchestration/contract layer。
+**Design principle（设计原则）:** **调库优先（library-first）**——尽量复用数据库与现成框架；项目自己的代码只做薄薄一层编排 / 契约（orchestration / contract layer）。
 
 - BM25 → PostgreSQL `ts_rank_cd`（无自定义 inverted index）
 - Dense → pgvector `<=>` cosine（无自定义 ANN engine）

@@ -2,7 +2,13 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 3）。
 
-**Goal:** 交付 MCP-native tool layer 的剩余部分。将 Zendesk / Slack / Salesforce / Intercom 从仅 `TOOLS` 的 stub 提升为真实 stdio MCP server（对齐 M2 Stripe 模板），用 `ToolBelt` 包装 discovery，并将 capability gate 从 `destructive` 扩展到 **write + destructive**（default-deny）。无需外部 SaaS credentials — 每个 server 保持 `mcp_servers.stripe` 的 “mock-first, deterministic in-memory store” 模式。
+**Goal（目标）:** 补齐 MCP-native 工具层剩下的部分，具体三件事：
+
+1. 把 Zendesk / Slack / Salesforce / Intercom 从只有 `TOOLS` 的桩（stub）升级成**真实的 stdio MCP server**（对齐 M2 的 Stripe 模板）；
+2. 用 `ToolBelt` 统一包装工具发现（discovery）；
+3. 把 capability（能力）关卡从只拦 `destructive` 扩展到 **write + destructive 都默认拒绝（default-deny）**。
+
+全程**不需要任何外部 SaaS 凭据**——每个 server 都沿用 `mcp_servers.stripe` 的「mock 优先、内存里确定性数据」模式。
 
 ---
 

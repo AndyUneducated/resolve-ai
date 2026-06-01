@@ -19,9 +19,9 @@
 
 ## 新增一个 SaaS
 
-1. 复制 `stripe/` 目录改名
-2. 改 `pyproject.toml` 的 package name + entry point
-3. 在 [`apps/api/.../mcp/registry.py`](../../apps/api/src/resolveai_api/mcp/registry.py) 加一行
-4. 在对应 Agent 的 `TOOL_WHITELIST` 里加白名单（决策 4 · Layer 2）
+1. 复制 `stripe/` 目录并改名。
+2. 改 `pyproject.toml` 的 package name + entry point。
+3. 在 [`apps/api/.../mcp/registry.py`](../../apps/api/src/resolveai_api/mcp/registry.py) 加一行注册。
+4. 在对应 Agent 的 `TOOL_WHITELIST` 里加白名单（即护栏 Layer 2 的 capability 白名单）。
 
-不需要改 Agent 代码本身（决策 3 收益）。
+整个过程**不需要改 Agent 代码本身**——这正是走 MCP 协议带来的收益。

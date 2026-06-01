@@ -2,7 +2,7 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 4）。
 
-**Goal:** 将现有 guardrail hook points 从 stub 升级为 input、execution、output、memory 四层上的 production-like 行为，同时保持架构简单、便于 Milestone 5 ablation。
+**Goal（目标）:** 把现有的护栏挂载点（guardrail hook points）从桩（stub）升级为「接近生产（production-like）」的行为，覆盖 input、execution、output、memory 四层；同时保持架构简单，方便 Milestone 5 做消融（ablation）。
 
 ---
 

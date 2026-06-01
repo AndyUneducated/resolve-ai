@@ -2,7 +2,7 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 2）。
 
-**Goal:** 交付一条端到端 vertical slice：本地 Ollama 驱动 LLM、structured triage、billing 的 Plan–Execute–Replan、经 stdio 的真实 Stripe MCP、LangChain MCP adapters 工具桥接，以及 LangGraph checkpointing（dev/prod 用 `AsyncPostgresSaver`，测试用 `MemorySaver`）。
+**Goal（目标）:** 打通一条端到端的纵切（vertical slice，即「一条贯穿全栈的最小可用链路」），包含：本地 Ollama 驱动的 LLM、结构化 triage、billing 的 Plan–Execute–Replan、经 stdio 接入的真实 Stripe MCP、LangChain MCP adapters 工具桥接，以及 LangGraph checkpointing（开发 / 生产用 `AsyncPostgresSaver`，测试用 `MemorySaver`）。
 
 ---
 

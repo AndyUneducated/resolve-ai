@@ -2,10 +2,10 @@
 
 欢迎为 ResolveAI 提 issue 或 PR —— 尤其欢迎以下方向：
 
-- 新增 MCP server（除现有 5 个 SaaS mock 之外）。
-- 补强四层 guardrails 的任意一层（input / exec / output / memory）。
-- 扩充 [`scripts/red_team.py`](scripts/red_team.py) 里的 200 题对抗集。
-- 接入新的 LLM provider 或 routing 策略。
+- 新增 MCP server（在现有 5 个 SaaS mock 之外）。
+- 补强四层护栏（guardrails）的任意一层（input / exec / output / memory）。
+- 扩充对抗集（200 条 adversarial prompt 在 [`apps/api/tests/fixtures/red_team.jsonl`](apps/api/tests/fixtures/red_team.jsonl)，入口脚本 [`scripts/eval_adversarial.py`](scripts/eval_adversarial.py)）。
+- 接入新的 LLM provider 或路由（routing）策略。
 
 ## 提交流程一图
 
@@ -54,8 +54,10 @@ make dev
 make lint        # ruff + eslint
 make typecheck   # mypy + tsc
 make test        # pytest + next lint
-make red-team    # 200 个 adversarial prompt，期望 0 PII leak
+make red-team    # 对抗 prompt 烟测（baseline profile，期望 0 PII 泄漏）
 ```
+
+> 完整 200 条对抗集用 `uv run python scripts/eval_adversarial.py` 跑。
 
 提交前跑一次 `make fmt` 自动修复 Python / 前端格式。新增 Python 包记得加进 `[tool.uv.workspace] members`。
 

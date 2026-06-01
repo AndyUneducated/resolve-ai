@@ -1,14 +1,17 @@
-# Roadmap — 从 scaffold 到 demo-ready
+# Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：Milestone 1–9 全部完成（详见下方各里程碑勾选项）。
+当前状态：**Milestone 1–9 全部完成**（详见下方各里程碑勾选项）。
 
-> **图例**：
-> 🧱 = 必做地基（table stakes，进面试的最低要求）
-> ⭐ = 差异化里程碑（top 10% → top 3% 的关键 leverage，**别跳过**）
+**图例：**
+
+| 标记 | 含义 |
+|---|---|
+| 🧱 | **必做地基**（table stakes）——进面试的最低要求 |
+| ⭐ | **差异化里程碑**——把排名从 top 10% 拉到 top 3% 的关键杠杆，**别跳过** |
 
 ### 里程碑全景（milestone map）
 
-九个里程碑分两类：🧱 地基把系统跑通，⭐ 差异化把「我做了」升级成「我用数字证明了」。箭头表示主要依赖关系。
+九个里程碑分两类：🧱 地基负责「把系统跑通」，⭐ 差异化负责「把『我做了』升级成『我用数字证明了』」。下图箭头表示主要依赖关系。
 
 ```mermaid
 flowchart LR
@@ -27,6 +30,20 @@ flowchart LR
   class M1,M2,M3,M4,M6 base;
   class M5,M7,M8,M9 star;
 ```
+
+### 一览表（at a glance）
+
+| # | 里程碑 | 类型 | 一句话产出 | 状态 |
+|---|---|:---:|---|:---:|
+| M1 | Hello-World 流通 | 🧱 | 前后端 + 测试一键跑通 | ✅ |
+| M2 | 单 Agent 真跑 | 🧱 | Triage + Billing 接 Ollama，真实 Stripe MCP + Plan-Execute-Replan | ✅ |
+| M3 | 5 SaaS 全 MCP-ize | 🧱 | 5 个 SaaS 全走 stdio MCP，三档 capability 白名单 | ✅ |
+| M4 | 四层 Guardrails | 🧱 | 输入 / 执行 / 输出 / 记忆四层真跑 | ✅ |
+| M5 | 对抗 Eval Harness | ⭐ | 250 条标注 prompt → Attribution / Ablation / FP 三张表 | ✅ |
+| M6 | Hybrid Retrieval | 🧱 | BM25 + dense + RRF + reranker，KB-grounded 回答 | ✅ |
+| M7 | Architecture Ablation | ⭐ | 120-ticket benchmark × 4 配置，量化 trade-off | ✅ |
+| M8 | Chaos Demo & 视频 | ⭐ | 5K 并发压测 + online regression gate + demo 视频 | ✅ |
+| M9 | 多租户硬隔离（RLS） | ⭐ | Postgres Row-Level Security 兜底应用层 bug | ✅ |
 
 ## Milestone 1 · Hello-World 流通（1 day）🧱 — ✅ Done
 

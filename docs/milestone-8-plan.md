@@ -2,9 +2,13 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 8）。
 
-**Goal:** 证明系统可 scale，在 M7 eval primitives 之上接 online regression，并把完整故事变成可重复 demo video。三项交付：5K-concurrent chaos load harness、OTel spans  feeding EvalGate push + regression gate、自动化 Playwright recorder + narration kit。
+**Goal（目标）:** 证明系统**扛得住规模（scale）**，在 M7 的 eval 原语之上接上**在线回归（online regression）**，并把完整故事做成一段**可重复的 demo 视频**。三项交付：
 
-**Design principle:** library-first 且 additive。新 `LLM_BACKEND=fake` 将 framework throughput 与 model latency 隔离；OTel spans 与 EvalGate 未配置时为 no-op，生产路径不变（121/121 tests 绿）。
+1. 5,000 并发的混沌压测 harness（chaos load）；
+2. OTel span → 喂给 EvalGate push + 回归门禁（regression gate）；
+3. 自动化的 Playwright 录制器 + 旁白脚本（narration kit）。
+
+**Design principle（设计原则）:** **调库优先（library-first）+ 增量式（additive）**。新增的 `LLM_BACKEND=fake` 把「框架吞吐」与「模型延迟」隔离开；OTel span 与 EvalGate 在未配置时都是空操作（no-op），生产路径不变（121/121 测试通过）。
 
 ---
 
@@ -77,13 +81,13 @@ make obs                         # 本地 OTel collector（debug exporter）
 
 ---
 
-## 4. 诚实 caveat
+## 4. 诚实的边界说明（caveat）
 
-- **Demo「录制」是自动化，非旁白。** Playwright recorder 产出真实 captioned `webm`；voiceover（来自 `narration.md`）在 Loom/QuickTime 后加，或直接 ship 带字幕静音视频。
-- **UI 保持现状**（scope 决策）。Chat UI 显示 agent step cards + guardrail flag chips + blocked banner，但不显示 tool calls / trace timeline / tenant switching。Trace 重的 beats（Layer 高亮、cross-tenant `PermissionError`、chaos metrics、ablation table）渲染进 `trace.html` / `metrics.html`，由同一 recorder 捕获。
-- **Cross-tenant block 在 Layer-4 边界复现。** 设计上 per-identity namespacing 使 checkpoint keys 不相交，公开 `stream()` 无法 collide；demo 直接 exercise `IsolatedCheckpointer` 的 tuple-namespace check（defense of record），抛出带精确 namespace-mismatch message 的 `CrossTenantAccessBlocked`。
-- **Fake backend 数字关于 throughput，非 quality。** Fake 下 token/$ 为 modeled placeholders；真实 economics 用 Ollama/Anthropic。
-- **EvalGate 仅 push + 本地 no-op。** `EvalGateClient.push()` 在设 `EVALGATE_ENDPOINT` 时 post trace summaries；已提交的 online-regression *gate* 离线对比 baseline file 工作。
+- **Demo 是「自动录制」，不是「带配音」。** Playwright 录制器产出的是带字幕的真实 `webm`；旁白（见 `narration.md`）可在 Loom / QuickTime 后期叠加，也可以直接发布「带字幕、无声」的版本。
+- **UI 维持现状**（范围内的取舍）。聊天 UI 会显示 agent step 卡片 + 护栏 flag chip + 拦截横幅，但**不**显示工具调用 / trace 时间线 / 租户切换。那些「重 trace」的片段（Layer 高亮、跨租户 `PermissionError`、chaos 指标、ablation 表）改为渲染进 `trace.html` / `metrics.html`，由同一个录制器一并捕获。
+- **跨租户拦截在 Layer-4 边界复现。** 设计上，按身份做命名空间隔离后，各 checkpoint key 互不相交，公开的 `stream()` 接口根本撞不到一起；所以 demo 直接触发 `IsolatedCheckpointer` 的元组命名空间校验（这才是真正的「防线」），抛出带精确「命名空间不匹配」信息的 `CrossTenantAccessBlocked`。
+- **Fake backend 的数字只关乎吞吐，不关乎质量。** fake 模式下 token / 美元都是建模出来的占位值；真实的经济性数据要用 Ollama / Anthropic 跑。
+- **EvalGate 只负责 push，本地未配置即空操作。** `EvalGateClient.push()` 在设了 `EVALGATE_ENDPOINT` 时才上报 trace 摘要；而已交付的在线回归**门禁**本身，是离线对比 baseline 文件来工作的。
 
 ---
 

@@ -2,9 +2,9 @@
 
 **Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 7）。
 
-**Goal:** 把「我用了 multi-agent / Plan-and-Execute / structured handoff / cost routing」升级为「我 **benchmark 过** 每个选择的代价与收益，能 defend 每一个 trade-off」。交付可复用 eval library + 120-ticket benchmark + 在 4 个对照配置上产出 Architecture Ablation Table 的 runner。
+**Goal（目标）:** 把「我用了 multi-agent / Plan-and-Execute / 结构化 handoff / cost routing」升级为「我 **benchmark 过**每个选择的代价与收益，能为每一个 trade-off 辩护」。交付物：一套可复用的 eval 库 + 120 条 ticket 的 benchmark + 一个能在 4 个对照配置上产出 Architecture Ablation Table 的 runner。
 
-**Design principle:** additive + library-first。四个 variant 是一个 `VariantSpec` 在四条独立轴上的组合；生产路径通过 defaults 保持在 variant **D**，M1–M6 行为不变（108/108 tests 绿）。Token/tool tracing 是 cross-cutting no-op，除非 eval run 激活它。
+**Design principle（设计原则）:** **增量式（additive）+ 调库优先（library-first）**。四个 variant 其实是同一个 `VariantSpec` 在四条独立轴上的不同取值；生产路径通过默认值保持在 variant **D**，M1–M6 行为完全不变（108/108 测试通过）。Token / 工具追踪是一条横切（cross-cutting）的空操作（no-op），只有 eval run 激活时才生效。
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Status:** 已实现（见 `docs/roadmap.md` Milestone 5）。
 
-**Goal:** 从「我们建了 4 层 guardrails」升级为「我们能用可复现 dataset + runner + report pipeline 对每一层做 attribution、ablation 与量化」。
+**Goal（目标）:** 从「我们建了 4 层护栏」升级为「我们有一套可复现的 数据集 + runner + 报告流水线，能对每一层做归因（attribution）、消融（ablation）与量化」。
 
 ---
 
