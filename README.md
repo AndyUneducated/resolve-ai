@@ -126,6 +126,66 @@ sequenceDiagram
 
 
 
+### LangGraph 拓扑：节点 / 边 / 状态（graph topology）
+
+LangGraph 的核心是「一张共享状态（`GraphState`）在节点间流动」：**节点（node）= 读 State → 干活 → 写回更新**，**边（edge）= 读 State 决定下一个跑谁**。下面三张图分别是顶层图、billing 子图、以及 State 的流转。
+
+**① 顶层 SupervisorGraph** —— `START → triage → (按 intent 路由) → 业务 Agent → END`：
+
+```mermaid
+flowchart TD
+  START((START)) --> triage["triage 节点<br/>意图分类 → 写 ticket_summary"]
+  triage -->|"_route_after_triage 条件边"| router{"intent = ?"}
+  router -->|billing| billing["billing 节点<br/>(内含子图②)"]
+  router -->|technical| technical["technical 节点<br/>KB 检索 + 作答"]
+  router -->|escalation| escalation["escalation 节点<br/>转人工"]
+  router -->|"other / 兜底"| E((END))
+  billing --> E
+  technical --> E
+  escalation --> E
+```
+
+**② Billing 子图** —— Plan-Execute-Replan 三节点闭环（`MAX_STEPS=6` 防死循环，`response` 非空即终止）：
+
+```mermaid
+flowchart TD
+  S((entry)) --> planner["planner 节点<br/>读 ticket_summary → 生成 plan[]"]
+  planner --> executor["executor 节点<br/>执行 plan[0] → 调工具 → 追加 past_steps<br/>iter_count += 1"]
+  executor -->|"_route_after_executor"| rex{"判断"}
+  rex -->|"plan 有剩 & 未超 MAX_STEPS · execute"| executor
+  rex -->|"plan 空了 · replan"| replanner["replanner 节点<br/>看 past_steps → 出 response 或改 plan"]
+  rex -->|"response 已生成 / iter≥6 · done"| E((END))
+  replanner -->|"_route_after_replanner"| rrep{"判断"}
+  rrep -->|"有新 plan & 未超步数 · execute"| executor
+  rrep -->|"response / 无 plan / iter≥6 · done"| E
+```
+
+> variant C 消融（`build_billing_react`）会把整个子图换成单节点 ReAct（`entry → agent → END`，`agent` 内部自循环最多 6 步）——「图即一等公民、可程序化重连」的体现。
+
+**③ State 流转** —— 节点之间不直接对话，全靠读写共享 `GraphState`：
+
+```mermaid
+flowchart LR
+  subgraph STATE["GraphState（共享状态）"]
+    direction TB
+    f1["messages（add_messages: 追加）"]
+    f2["tenant_id / customer_id / thread_id（隔离 key）"]
+    f3["ticket_summary（结构化 handoff 载荷）"]
+    f4["plan[]（Plan-Execute 计划）"]
+    f5["tool_calls[]（工具 trace）"]
+    f6["guardrail_flags[]（护栏标记）"]
+  end
+  triage -.->|"写 ticket_summary"| f3
+  f3 -.->|"读 intent 路由"| route{{"_route_after_triage"}}
+  f3 -.->|"读 summary 作输入"| billing
+  billing -.->|"写 plan / tool_calls / messages"| f4
+  billing -.-> f5
+  inputguard["Layer1 输入护栏"] -.->|"写 flags"| f6
+  outputguard["Layer3 输出护栏"] -.->|"读 messages/tool_calls 复扫"| f5
+```
+
+
+
 逐里程碑（milestone）的设计决策与产出，见 [docs/roadmap.md](docs/roadmap.md) 及各 `docs/milestone-*-plan.md`。
 
 ## 仓库结构
