@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from resolveai_api.core.checkpointer import CrossTenantAccessBlocked, IsolatedCheckpointer
+from resolveai_api.core.checkpointer import CrossTenantAccessBlockedError, IsolatedCheckpointer
 from resolveai_api.guardrails.eval_scoring import (
     build_profile_coverage,
     build_summary,
@@ -140,7 +140,7 @@ async def test_l4_blocks_cross_tenant_when_enabled() -> None:
             "user_customer_id": "cust-1",
         }
     }
-    with pytest.raises(CrossTenantAccessBlocked):
+    with pytest.raises(CrossTenantAccessBlockedError):
         await saver.aget_tuple(config)
 
 

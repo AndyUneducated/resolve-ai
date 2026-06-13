@@ -33,7 +33,7 @@ flowchart TD
   `customers` / `tickets` / `kb_documents` / `agent_checkpoints` 4 张表均以 `tenant_id` 为租户键；`tenants` 是租户注册表，主键是 `id`（**无 `tenant_id` 列**，RLS 需单独处理，见 §3/§5）。tenant_id 列贯穿表的目标基本达成，本里程碑只补审计。
 - **应用层隔离已真跑**：
   - `retrieval/store.py` 的 `KbStore` 每条 dense/lexical 查询强制 `WHERE tenant_id = :tenant_id`，无无租户全库检索。
-  - `core/checkpointer.py` 的 `IsolatedCheckpointer` + `guardrails/memory_isolator.py` 对 checkpoint 命名空间（`tenant::customer::thread`）做 `assert_match`，跨租户访问抛 `CrossTenantAccessBlocked`。
+  - `core/checkpointer.py` 的 `IsolatedCheckpointer` + `guardrails/memory_isolator.py` 对 checkpoint 命名空间（`tenant::customer::thread`）做 `assert_match`，跨租户访问抛 `CrossTenantAccessBlockedError`。
 - **两条不同的 DB 访问路径**（RLS 接入方式不同，见 §3）：
   1. **SQLAlchemy async engine**（`retrieval/store.py:get_engine()`，进程级 `lru_cache`）—— KB 检索、未来 `tickets` 查询。
   2. **LangGraph `AsyncPostgresSaver`**（`core/checkpointer.py`，自管 psycopg 连接池与 `checkpoints` / `checkpoint_writes` / `checkpoint_blobs` 表，按 `thread_id` 组织，**无 tenant_id 列**）。

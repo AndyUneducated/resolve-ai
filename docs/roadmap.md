@@ -212,7 +212,7 @@ flowchart LR
 - [x] **3 分钟 Demo 视频**（自动化录制 + 旁白脚本）—— `apps/web/demo/record.spec.ts`（Playwright，烧字幕，输出真实 `webm`）走 4 段脚本；UI 保持现状，trace/metrics 段由 `scripts/render_metrics_page.py` 生成 `trace.html` / `metrics.html` 供录制：
   - 0:00-0:30 正常 ticket：Triage → Billing → refund → 成功（live `/chat`）
   - 0:30-1:30 对抗 ticket：indirect injection 被 Layer 1 标记（flag chip），Layer 3 输出侧 re-scan（trace 高亮）
-  - 1:30-2:00 跨租户串号攻击：`IsolatedCheckpointer` namespace check 抛 `CrossTenantAccessBlocked`，trace 复现命名空间 mismatch
+  - 1:30-2:00 跨租户串号攻击：`IsolatedCheckpointer` namespace check 抛 `CrossTenantAccessBlockedError`，trace 复现命名空间 mismatch
   - 2:00-3:00 chaos load 实时 metrics（P95 gate）+ Architecture Ablation 表
 - [x] 简历 bullet 直接挂视频链接 —— 见 [`docs/milestone-8-plan.md`](milestone-8-plan.md) §2（录制后填 Loom/YouTube 链接）。旁白/分镜：[`docs/demo/narration.md`](demo/narration.md) · [`docs/demo/shot-list.md`](demo/shot-list.md)
 

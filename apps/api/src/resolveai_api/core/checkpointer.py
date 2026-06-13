@@ -20,7 +20,7 @@ from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.guardrails.memory_isolator import MemoryIsolator
 
 
-class CrossTenantAccessBlocked(PermissionError):
+class CrossTenantAccessBlockedError(PermissionError):
     """Raised when checkpoint namespace does not match request identity."""
 
 
@@ -49,7 +49,7 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
                     ns=ns, tenant_id=tenant_id, customer_id=customer_id
                 )
             except PermissionError as exc:
-                raise CrossTenantAccessBlocked(str(exc)) from exc
+                raise CrossTenantAccessBlockedError(str(exc)) from exc
 
     def _assert_tuple_namespace(self, checkpoint_tuple: object, config: dict[str, Any]) -> None:
         if not self._enabled:
@@ -72,7 +72,7 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
                     ns=tuple_ns, tenant_id=tenant_id, customer_id=customer_id
                 )
             except PermissionError as exc:
-                raise CrossTenantAccessBlocked(str(exc)) from exc
+                raise CrossTenantAccessBlockedError(str(exc)) from exc
 
     def get_tuple(self, config: dict[str, Any]) -> Any:
         self._assert_namespace(config)

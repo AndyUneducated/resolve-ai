@@ -85,7 +85,7 @@ make obs                         # 本地 OTel collector（debug exporter）
 
 - **Demo 是「自动录制」，不是「带配音」。** Playwright 录制器产出的是带字幕的真实 `webm`；旁白（见 `narration.md`）可在 Loom / QuickTime 后期叠加，也可以直接发布「带字幕、无声」的版本。
 - **UI 维持现状**（范围内的取舍）。聊天 UI 会显示 agent step 卡片 + 护栏 flag chip + 拦截横幅，但**不**显示工具调用 / trace 时间线 / 租户切换。那些「重 trace」的片段（Layer 高亮、跨租户 `PermissionError`、chaos 指标、ablation 表）改为渲染进 `trace.html` / `metrics.html`，由同一个录制器一并捕获。
-- **跨租户拦截在 Layer-4 边界复现。** 设计上，按身份做命名空间隔离后，各 checkpoint key 互不相交，公开的 `stream()` 接口根本撞不到一起；所以 demo 直接触发 `IsolatedCheckpointer` 的元组命名空间校验（这才是真正的「防线」），抛出带精确「命名空间不匹配」信息的 `CrossTenantAccessBlocked`。
+- **跨租户拦截在 Layer-4 边界复现。** 设计上，按身份做命名空间隔离后，各 checkpoint key 互不相交，公开的 `stream()` 接口根本撞不到一起；所以 demo 直接触发 `IsolatedCheckpointer` 的元组命名空间校验（这才是真正的「防线」），抛出带精确「命名空间不匹配」信息的 `CrossTenantAccessBlockedError`。
 - **Fake backend 的数字只关乎吞吐，不关乎质量。** fake 模式下 token / 美元都是建模出来的占位值；真实的经济性数据要用 Ollama / Anthropic 跑。
 - **EvalGate 只负责 push，本地未配置即空操作。** `EvalGateClient.push()` 在设了 `EVALGATE_ENDPOINT` 时才上报 trace 摘要；而已交付的在线回归**门禁**本身，是离线对比 baseline 文件来工作的。
 

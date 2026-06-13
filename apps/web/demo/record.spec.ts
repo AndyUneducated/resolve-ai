@@ -112,7 +112,7 @@ test("ResolveAI 3-minute demo", async ({ page }) => {
     time: "1:30",
     title: "Cross-tenant attack · namespace check → PermissionError",
     subtitle:
-      "Replaying another tenant's thread_id raises CrossTenantAccessBlocked; the trace reproduces the block.",
+      "Replaying another tenant's thread_id raises CrossTenantAccessBlockedError; the trace reproduces the block.",
   });
   await page.waitForTimeout(PACE / 2);
   await page.mouse.wheel(0, 600);

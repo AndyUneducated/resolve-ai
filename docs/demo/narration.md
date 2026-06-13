@@ -42,7 +42,7 @@ On screen：`/chat` 显示黄色 `indirect_injection_suspected` flag chip；`tra
 > Caption: "Cross-tenant attack · namespace check → PermissionError"
 
 Voiceover：
-「Multi-tenant isolation 是 Layer 4。每个 checkpoint 按 tenant 与 customer namespaced。当 tenant B 的请求试图 replay tenant A 的 thread 时，`IsolatedCheckpointer` 的 namespace check 抛出 `CrossTenantAccessBlocked` — 硬 `PermissionError` — 在读任何 state 之前。Trace 复现 exact block 与 namespace mismatch message。」
+「Multi-tenant isolation 是 Layer 4。每个 checkpoint 按 tenant 与 customer namespaced。当 tenant B 的请求试图 replay tenant A 的 thread 时，`IsolatedCheckpointer` 的 namespace check 抛出 `CrossTenantAccessBlockedError` — 硬 `PermissionError` — 在读任何 state 之前。Trace 复现 exact block 与 namespace mismatch message。」
 
 On screen：`trace.html` cross-tenant 段 — 红色 BLOCKED step，显示 `Cross-tenant/customer state access blocked: tenant_a::cus_001::ct-001 vs tenant_b::cus_001::*` 与 `cross_tenant_blocked` chip。
 

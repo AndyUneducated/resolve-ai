@@ -166,7 +166,7 @@ async def _collect_scenarios() -> list[dict[str, Any]]:
 
 async def _cross_tenant_block() -> dict[str, Any]:
     from resolveai_api.core.checkpointer import (
-        CrossTenantAccessBlocked,
+        CrossTenantAccessBlockedError,
         IsolatedCheckpointer,
     )
 
@@ -205,7 +205,7 @@ async def _cross_tenant_block() -> dict[str, Any]:
     try:
         await guard.aget_tuple(attacker_config)
         detail = "(no block raised)"
-    except CrossTenantAccessBlocked as exc:
+    except CrossTenantAccessBlockedError as exc:
         detail = str(exc)
     events.append(
         {

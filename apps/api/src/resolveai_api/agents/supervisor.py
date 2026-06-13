@@ -31,7 +31,7 @@ from resolveai_api.agents.technical import TOOL_WHITELIST as TECHNICAL_WHITELIST
 from resolveai_api.agents.technical import TechnicalAgent
 from resolveai_api.agents.triage import TriageAgent
 from resolveai_api.config import get_settings
-from resolveai_api.core.checkpointer import CrossTenantAccessBlocked
+from resolveai_api.core.checkpointer import CrossTenantAccessBlockedError
 from resolveai_api.core.executor import Executor
 from resolveai_api.guardrails.attribution import GuardrailReport, blocked_by_flags
 from resolveai_api.guardrails.input_filter import InputGuardrail
@@ -283,7 +283,7 @@ class SupervisorGraph:
                                 {"agent": node_name, "content": safe, "flags": out_flags}
                             ),
                         }
-            except CrossTenantAccessBlocked:
+            except CrossTenantAccessBlockedError:
                 all_flags.append("cross_tenant_blocked")
                 _emit_report(report_sink, all_flags)
                 _set(ticket_span, "outcome", "blocked")
