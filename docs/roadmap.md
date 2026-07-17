@@ -1,6 +1,6 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）+ M11（可观测闭环 & 成本治理）已实施**；**M12–M15 规划中**。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）+ M11（可观测闭环 & 成本治理）+ M12（Human-in-the-Loop 接力）已实施**；**M13–M15 规划中**。
 
 > **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
 > `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
@@ -42,8 +42,8 @@ flowchart LR
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
   class M1,M2,M3,M4,M6 base;
-  class M5,M7,M8,M9,M10,M11 star;
-  class M12,M13,M14,M15 plan;
+  class M5,M7,M8,M9,M10,M11,M12 star;
+  class M13,M14,M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -61,7 +61,7 @@ flowchart LR
 | M9 | 多租户硬隔离（RLS） | ⭐ | Postgres Row-Level Security 兜底应用层 bug | ✅ |
 | **M10** | 生产级护栏 & 真沙箱 | ⭐ | fail-closed 默认 + 真实 rlimit 沙箱 + 逃逸测试量化 | ✅ |
 | **M11** | 可观测闭环 & 成本治理 | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + 成本预算熔断 + 成本回归门 | ✅ |
-| **M12** | Human-in-the-Loop 接力 | ⭐ | LangGraph `interrupt` 审批 + 断点续聊 + 坐席交接 | 📋 |
+| **M12** | Human-in-the-Loop 接力 | ⭐ | Executor 审批闸（destructive）+ approve/deny/edit API + `awaiting_approval` SSE + 坐席接管 | ✅ |
 | **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 语义缓存降本降延迟 | 📋 |
 | **M14** | Eval→数据飞轮 | ⭐ | 生产 trace 自动回灌 eval 集 + 回归门在线自改进 | 📋 |
 | **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错 + CI type gate + compose/K8s 一键起 | 📋 |
@@ -288,16 +288,16 @@ flowchart LR
 
 详细技术方案见 [`docs/milestone-11-plan.md`](milestone-11-plan.md)。
 
-## Milestone 12 · Human-in-the-Loop 接力（3 days）⭐ — 📋 Planned
+## Milestone 12 · Human-in-the-Loop 接力（3 days）⭐ — ✅ Done
 
-> **目标**：把"escalation 真路由"升级为"真正的人机协作" —— 高风险动作前**中断等待人工审批**，坐席可续聊、可接管。
+> **目标**：把"escalation 真路由"升级为"真正的人机协作" —— 高风险动作前**挂起等待人工审批**，坐席可接管。
 
 - **已落地地基**：billing/technical → escalation **真图边**（`escalate` flag + `_route_after_vertical`），取代文字后缀。
-- [ ] LangGraph `interrupt()` 在 destructive 动作（退款 / 删除 / 升级）前挂起，等待人工 approve/deny
-- [ ] 审批 API + 前端审批卡片：待办队列、approve/deny/edit，决策写回 checkpoint 续跑
-- [ ] 坐席接管：把 thread 从 Agent 交给人工（沿用 `AsyncPostgresSaver` 断点续聊 + 跨班次恢复）
-- [ ] 审批审计：谁在何时批了什么（对齐 M3 destructive `audit=True`）
-- [ ] e2e 测试：中断 → 审批 → 续跑，deny 路径回退安全响应
+- [x] 审批闸在 destructive 动作前挂起（放 `Executor.call_tool` 收敛点，非嵌套 `interrupt()`）：`core/approvals.py` + request-scoped `ApprovalContext`；`APPROVAL_MODE=off` 默认零行为变化
+- [x] 审批 API（`GET/POST /api/v1/approvals`）+ 前端审批卡片：approve/deny/edit；批准后**重放恢复**（对话态由既有 checkpointer 持久化）
+- [x] 坐席接管：`POST /api/v1/threads/takeover|release` → `human_owned` 时 `Supervisor.stream` 短路自动化
+- [x] 审批审计：who/when/decision/edited_args/note（对齐 M3 destructive `audit=True`）+ `resolveai_approvals_pending_total` 指标
+- [x] e2e：park → approve → 重放执行；deny 阻断；edit 用改后 args；takeover 短路（`test_approvals.py`，18 用例，全绿）
 
 详细技术方案见 [`docs/milestone-12-plan.md`](milestone-12-plan.md)。
 

@@ -1,10 +1,10 @@
 # Milestone 12 — Human-in-the-Loop 接力
 
-**Status:** 📋 规划中。**地基已落地**：billing/technical → escalation 现在是**真图边**（`GraphState.escalate` + `agents/supervisor.py::_route_after_vertical` 条件路由 + `add_conditional_edges`），取代了旧的「文字建议后缀」；`test_hardening.py::test_billing_escalation_is_a_real_graph_handoff` 验证 escalation 节点真的会执行。
+**Status:** ✅ **已实现**（approval gate + 审批/接管 API + `awaiting_approval` SSE + 前端审批卡片 + 全绿 e2e）。默认 `APPROVAL_MODE=off`，行为与 M12 前**逐字节一致**；打开后 destructive 动作全部走人工闸。
 
-**Goal:** 把「Agent 自动升级」升级为「真正的人机协作」：高风险动作**执行前中断等待人工审批**，人工可 approve/deny/edit，坐席可**接管** thread；全程沿用 `AsyncPostgresSaver` 的断点续聊 / 跨班次恢复。
+**Goal:** 把「Agent 自动升级」升级为「真正的人机协作」：高风险（destructive capability）动作**执行前挂起等待人工审批**，人工可 approve / deny / edit，坐席可**接管** thread；全程沿用 `AsyncPostgresSaver` 的断点续聊 / 跨班次恢复。
 
-**Design principle:** 调库优先 —— 用 LangGraph 官方 `interrupt()` / `Command(resume=...)` 做 human-in-the-loop，不自研挂起-恢复；决策持久化复用现有 checkpointer。
+**Design principle（诚实的取舍）：** 审批闸放在**唯一的 `Executor.call_tool` 收敛点**（`core/approvals.py` + request-scoped `ApprovalContext`），而**不是**在嵌套子图里用 `interrupt()`——后者要在 billing/escalation 子图 + SSE 流式 + resume 之间打通挂起态，脆弱且回归风险高。挂起动作的 request id 由 `(thread_ref, tool, args)` **确定性派生**，因此人工 approve 后**重放恢复**（re-run 同一 ticket → 同一 destructive step 命中 `APPROVED` 决策 → 真执行），对话态由既有 checkpointer 持久化。**在图内 `Command(resume=...)` 原地续跑**列为进一步生产化（见 §6），当前不在范围。
 
 ```mermaid
 flowchart TD
@@ -12,13 +12,13 @@ flowchart TD
   tri --> ba["Billing / Escalation Agent"]
   ba --> risk{"destructive 动作?<br/>refund / delete / escalate"}
   risk -- 否 --> done["直接执行 → 回复"]
-  risk -- 是 --> intr["interrupt(payload)<br/>图挂起 + 写 checkpoint（可续）"]
-  intr --> sse["SSE: awaiting_approval"]
-  sse --> human["人工审批卡片 / 待办队列"]
-  human -- approve/edit --> res["Command(resume) → 执行动作"]
-  human -- deny --> safe["回退安全响应 + 记审计"]
-  human -- takeover --> ho["thread=human_owned<br/>坐席直接续聊"]
-  res --> audit["审计：who/when/decision/args"]
+  risk -- 是 --> gate["Executor 审批闸<br/>store.require(thread,tool,args)"]
+  gate -- 无决策 --> park["park：不执行 + 记 pending<br/>SSE: awaiting_approval"]
+  park --> human["人工审批卡片 / 待办队列"]
+  human -- approve/edit --> replay["重放 ticket → 命中 APPROVED → 执行"]
+  human -- deny --> safe["阻断 destructive + 记审计"]
+  human -- takeover --> ho["thread=human_owned<br/>后续消息短路自动化"]
+  replay --> audit["审计：who/when/decision/args"]
   safe --> audit
 ```
 
@@ -36,23 +36,24 @@ flowchart TD
 2. 无审批 UI / API，无待办队列。
 3. 无「坐席接管」路径（人工替代 Agent 继续对话）。
 
-## 3. 技术方案
+## 3. 技术方案（已实现）
 
-### 3.1 审批中断
-- billing/escalation 子图在 destructive 工具调用前 `interrupt({"action": ..., "args": ..., "risk": ...})`，图挂起并把待审 payload 写入 checkpoint。
-- `/chat` SSE 增加 `awaiting_approval` 事件；前端渲染审批卡片。
+### 3.1 审批闸（Executor 收敛点）
+- `core/approvals.py`：`ApprovalStore`（线程安全、进程内；id = `sha256(thread_ref|tool|sorted(args))[:16]`，order-insensitive）+ request-scoped `ApprovalContext(thread_ref, tenant_id, enabled, pending)` contextvar，镜像 `core.usage.capture_run` 模式。
+- `Executor.call_tool`：仅当 `capability=="destructive"` 且当前 `ApprovalContext.enabled` 时启用闸；`APPROVED`→（用 `edited_args` 若有）真执行，`DENIED`→返回阻断 sentinel 不执行，`PENDING/无`→登记 pending + 返回 `[awaiting human approval]` sentinel（**不执行**）。`ExecutionResult.approval ∈ none|pending|denied`。
+- `Supervisor.stream`：图跑完后若 `ctx.pending` 非空 → 发 `awaiting_approval` SSE（含 pending 明细）并 `record_awaiting()`（`resolveai_approvals_pending_total` + `tickets_total{outcome="awaiting_approval"}`），不再发 `done`。
 
 ### 3.2 审批 API + UI
-- `POST /approvals/{thread_id}`：`{decision: approve|deny|edit, edited_args?}` → `graph.ainvoke(Command(resume=decision), config)` 续跑。
-- `GET /approvals`：待办队列（按 tenant / 风险排序）。
-- 前端 `/chat` 审批卡片 + `/approvals` 待办页（复用现有组件风格）。
+- `GET /api/v1/approvals?tenant_id=&status=`：待办/历史队列。`GET /api/v1/approvals/{id}`：单条（含审计字段）。
+- `POST /api/v1/approvals/{id}`：`{decision: approve|deny|edit, by?, edited_args?, note?}`；非法 decision→400，未知 id→404。
+- 前端 `/chat`：`awaiting_approval` → 渲染审批卡片（工具 + args + 批准/拒绝）；批准后**重放**续跑；`human_owned` → 提示接管中。
 
 ### 3.3 坐席接管
-- `POST /threads/{id}/takeover`：把 thread 标为 `human_owned`，后续消息不再进 Agent 图，由坐席直接回复（写入同一 messages checkpoint，跨班次可恢复）。
-- 交回：`release` 回到 Agent。
+- `POST /api/v1/threads/takeover` `{tenant_id, customer_id, thread_id, owner}` → 把 `namespace` 标为 human-owned；`Supervisor.stream` 开头短路发 `human_owned`、不进 Agent 图。
+- `POST /api/v1/threads/release`：交回自动化。
 
 ### 3.4 审计
-- 审批/接管决策落 `agent_checkpoints` 关联审计记录：who / when / decision / edited_args。
+- `ApprovalRequest` 记 who(`decided_by`) / when(`decided_at`) / decision(`status`) / edited_args / note，经 `to_public()` 出 API。生产可把 store 换 Postgres 持久化（接口已存储无关）。
 
 ## 4. 生产化 & 行业对齐（review）
 
@@ -65,8 +66,15 @@ flowchart TD
 
 ## 5. 验收
 
-- [ ] destructive 动作前中断，approve 后才执行；deny 回退安全响应
-- [ ] 审批卡片 + 待办队列前端可用
-- [ ] 坐席接管 → 续聊 → 交回，跨进程重启后 thread 状态恢复
-- [ ] e2e 测试覆盖 approve / deny / takeover 三条路径
-- [ ] 新增测试全绿，`ruff`/`mypy` 不新增错误
+- [x] destructive 动作前挂起（不执行），approve 后重放才执行；deny 阻断（`test_gate_parks_then_denies_then_approves`、`test_escalation_parks_destructive_then_resumes_on_approval`）
+- [x] `edit` 决策以人工修改后的 args 执行（`test_gate_edit_executes_with_edited_args`）
+- [x] 审批 API roundtrip + 前端审批卡片（`test_approvals_api_roundtrip`；`apps/web/app/chat/page.tsx`，tsc + eslint 全绿）
+- [x] 坐席接管 → 自动化短路（`test_takeover_api`、`test_supervisor_short_circuits_when_thread_is_human_owned`）
+- [x] `APPROVAL_MODE=off` 默认零行为变化；e2e 覆盖 park/deny/approve/edit/takeover/human_owned（`test_approvals.py`，18 用例）
+- [x] 新增测试全绿（171 passed LM-free），`ruff` clean，`mypy src` 不新增错误（38→38）
+
+## 6. 进一步生产化（明确不在本次范围）
+
+- **图内原地续跑**：用 LangGraph `interrupt()`/`Command(resume=...)` 在挂起点原地恢复（免重放），需打通嵌套子图 + SSE 挂起态；当前用**重放恢复**（幂等、确定性、可测）替代。
+- **审批持久化**：`ApprovalStore` 换 Postgres（多副本 / 重启可续）；接口已存储无关。
+- **真 RBAC**：审批人身份现为 demo-trust（前端自报），与 M9 RLS 的诚实定位一致；防冒充审批人属未来工作。

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from resolveai_api.agents.supervisor import SupervisorGraph
-from resolveai_api.api import chat, health, metrics, tickets
+from resolveai_api.api import approvals, chat, health, metrics, tickets
 from resolveai_api.config import get_settings
 from resolveai_api.core.checkpointer import lifespan_checkpointer
 from resolveai_api.mcp.toolbelt import ToolBelt
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(chat.router, prefix="/api/v1")
     app.include_router(tickets.router, prefix="/api/v1")
+    app.include_router(approvals.router, prefix="/api/v1")
 
     return app
 

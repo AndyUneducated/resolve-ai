@@ -174,6 +174,13 @@ class Settings(BaseSettings):
     # Default is deliberately generous for the demo; tighten in production profiles.
     cost_budget_usd: float = Field(default=0.05, alias="COST_BUDGET_USD")
 
+    # ---------- Human-in-the-Loop (M12) ----------
+    approval_mode: str = Field(default="off", alias="APPROVAL_MODE")
+    """off (default — no gate, byte-identical to pre-M12) | destructive (park every
+    destructive-capability tool call for human approve/deny/edit) | auto (follow
+    ENV_PROFILE — `production` → destructive, else off). The gate lives at the
+    Executor chokepoint; parked runs emit an `awaiting_approval` SSE event."""
+
     # ---------- Tenant ----------
     default_tenant_id: str = Field(default="demo", alias="DEFAULT_TENANT_ID")
 

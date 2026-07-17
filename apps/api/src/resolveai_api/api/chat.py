@@ -35,9 +35,12 @@ async def chat(
     """SSE 流：每个 Agent 步骤一个 event。
 
     事件类型（与 `SupervisorGraph.stream` 对齐）：
-    - `agent_step`：某个 Agent 产出一段回复，data = {agent, content, flags}
-    - `blocked`：被护栏拦截（L1 输入 / L3 输出 / L4 跨租户），data = {reason}
-    - `done`：本轮结束，data = {}
+    - `agent_step`：某个 Agent 产出一段回复，data = {agent, content, flags, tool_calls}
+    - `blocked`：被护栏拦截（L1 输入 / L3 输出 / L4 跨租户），data = {reason, layer, kind}
+    - `awaiting_approval`：destructive 动作被 HITL 网关挂起待人工审批（M12），
+      data = {thread_ref, pending:[{id, tool, args, ...}]}
+    - `human_owned`：该 thread 已被人工坐席接管（M12），data = {owner, thread_ref}
+    - `done`：本轮结束，data = {tokens, cost_usd, over_budget, guardrail_latency_ms, ...}
     """
 
     # 租户身份统一由 get_tenant_id 解析（无鉴权，demo 回退 DEFAULT_TENANT_ID）；

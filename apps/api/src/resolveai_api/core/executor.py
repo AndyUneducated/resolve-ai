@@ -39,6 +39,8 @@ class ExecutionResult:
     sandbox_violations: list[str] = field(default_factory=list)
     capability: str = "read"
     audit: bool = False
+    # HITL gate (M12): "none" | "pending" (parked, not executed) | "denied" (blocked)
+    approval: str = "none"
 
 
 class Executor:
@@ -59,6 +61,70 @@ class Executor:
     @staticmethod
     def _capability(tool: BaseTool) -> str:
         return str((tool.metadata or {}).get("capability", "read"))
+
+    def _approval_gate(self, full: str, args: dict[str, Any]) -> ExecutionResult | None:
+        """Return a park/deny `ExecutionResult` (tool NOT run), or None to proceed.
+
+        No-op unless an enabled `ApprovalContext` is active (`APPROVAL_MODE`), so
+        the default path is byte-identical to pre-M12.
+        """
+        from resolveai_api.core.approvals import (
+            ApprovalStatus,
+            current_approval_context,
+            get_approval_store,
+        )
+
+        ctx = current_approval_context()
+        if ctx is None or not ctx.enabled:
+            return None
+
+        request = get_approval_store().require(
+            thread_ref=ctx.thread_ref,
+            tenant_id=ctx.tenant_id,
+            tool=full,
+            capability="destructive",
+            args=args,
+        )
+        if request.status is ApprovalStatus.APPROVED:
+            return None  # proceed; edited args applied by _approved_args
+        if request.status is ApprovalStatus.DENIED:
+            return ExecutionResult(
+                tool=full,
+                args=args,
+                output=f"[blocked] human reviewer denied {full} (approval {request.id})",
+                duration_ms=0.0,
+                capability="destructive",
+                audit=True,
+                approval="denied",
+            )
+        # PENDING — park it and surface to the Supervisor via the request context.
+        if request not in ctx.pending:
+            ctx.pending.append(request)
+        return ExecutionResult(
+            tool=full,
+            args=args,
+            output=f"[awaiting human approval] {full} parked as approval {request.id}",
+            duration_ms=0.0,
+            capability="destructive",
+            audit=True,
+            approval="pending",
+        )
+
+    def _approved_args(self, full: str, args: dict[str, Any]) -> dict[str, Any]:
+        """When a human `edit`-approved the call, execute with the edited args."""
+        from resolveai_api.core.approvals import current_approval_context, get_approval_store
+
+        ctx = current_approval_context()
+        if ctx is None or not ctx.enabled:
+            return args
+        request = get_approval_store().require(
+            thread_ref=ctx.thread_ref,
+            tenant_id=ctx.tenant_id,
+            tool=full,
+            capability="destructive",
+            args=args,
+        )
+        return request.effective_args()
 
     def _check_capability(self, tool: BaseTool, whitelist: list[str]) -> None:
         capability = self._capability(tool)
@@ -82,6 +148,20 @@ class Executor:
         audit = capability == "destructive"
 
         from resolveai_api.core.usage import looks_like_error, record_tool_call
+
+        # ---- HITL approval gate (M12) — destructive tools only, opt-in ----
+        if capability == "destructive":
+            gate = self._approval_gate(full, args)
+            if gate is not None:
+                record_tool_call(
+                    tool=full,
+                    args=args,
+                    output=gate.output,
+                    is_error=False,
+                    duration_ms=0.0,
+                )
+                return gate
+            args = self._approved_args(full, args)
 
         with span(
             _TRACER,

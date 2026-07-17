@@ -32,6 +32,11 @@ from resolveai_api.agents.technical import TOOL_WHITELIST as TECHNICAL_WHITELIST
 from resolveai_api.agents.technical import TechnicalAgent
 from resolveai_api.agents.triage import TriageAgent
 from resolveai_api.config import get_settings
+from resolveai_api.core.approvals import (
+    approval_context,
+    get_approval_store,
+    resolve_approval_enabled,
+)
 from resolveai_api.core.budget import is_over_budget
 from resolveai_api.core.checkpointer import CrossTenantAccessBlockedError
 from resolveai_api.core.executor import Executor
@@ -250,7 +255,25 @@ class SupervisorGraph:
         )
         guardrail_ms = {"input": 0.0, "output": 0.0}
 
-        with capture_run() as run_trace, span(
+        # HITL (M12): if a human agent has taken over this thread, do not run the
+        # automation — surface ownership so the caller routes to the live agent.
+        store = get_approval_store()
+        if store.is_human_owned(namespace):
+            yield {
+                "type": "human_owned",
+                "data": json.dumps(
+                    {"owner": store.owner(namespace), "thread_ref": namespace}
+                ),
+            }
+            return
+        approval_enabled = resolve_approval_enabled(
+            getattr(settings, "approval_mode", "off"),
+            getattr(settings, "env_profile", "demo"),
+        )
+
+        with capture_run() as run_trace, approval_context(
+            thread_ref=namespace, tenant_id=tenant_id, enabled=approval_enabled
+        ) as appr_ctx, span(
             _TRACER,
             "ticket.run",
             attributes={
@@ -382,6 +405,26 @@ class SupervisorGraph:
                 yield {
                     "type": "blocked",
                     "data": json.dumps({"reason": ["cross_tenant_blocked"]}),
+                }
+                return
+
+            # HITL (M12): a destructive tool got parked → the ticket is suspended
+            # for human review instead of completing. Resume by approving via
+            # `POST /approvals/{id}` then re-sending the ticket (resume-by-replay).
+            if appr_ctx.pending:
+                _emit_report(report_sink, all_flags)
+                _set(ticket_span, "outcome", "awaiting_approval")
+                _set(ticket_span, "pending_approvals", len(appr_ctx.pending))
+                prom_metrics.record_awaiting(len(appr_ctx.pending))
+                yield {
+                    "type": "awaiting_approval",
+                    "data": json.dumps(
+                        {
+                            "thread_ref": namespace,
+                            "pending": [r.to_public() for r in appr_ctx.pending],
+                        },
+                        default=str,
+                    ),
                 }
                 return
             # Cost circuit-breaker outcome (M11): flag when the run blew its budget

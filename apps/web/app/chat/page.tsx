@@ -10,6 +10,13 @@ type AgentStep = {
   flags: string[];
   toolCalls: ToolCall[];
 };
+type PendingApproval = {
+  id: string;
+  tool: string;
+  capability: string;
+  args: Record<string, unknown>;
+  status: string;
+};
 
 /** sse-starlette 使用 CRLF；用 `\n\n` 切事件前需归一化，否则会整包粘在一起、JSON 带 `\r` 解析失败。 */
 function splitSseEvents(raw: string): { events: string[]; rest: string } {
@@ -34,6 +41,10 @@ function ChatPageContent() {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ threadRef: string; items: PendingApproval[] } | null>(
+    null,
+  );
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (presetApplied.current) return;
@@ -50,6 +61,8 @@ function ChatPageContent() {
     setStreaming(true);
     setSteps([]);
     setError(null);
+    setPending(null);
+    setNotice(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const controller = new AbortController();
@@ -103,6 +116,21 @@ function ChatPageContent() {
               setError(`Request blocked by safety policy: ${reason}`);
               continue;
             }
+            if (eventName === "awaiting_approval") {
+              setPending({
+                threadRef: String(payload.thread_ref ?? ""),
+                items: Array.isArray(payload.pending)
+                  ? (payload.pending as PendingApproval[])
+                  : [],
+              });
+              continue;
+            }
+            if (eventName === "human_owned") {
+              setNotice(
+                `该会话已被人工坐席接管（${String(payload.owner ?? "")}），自动化已暂停。`,
+              );
+              continue;
+            }
             const agent = payload.agent;
             if (eventName === "agent_step" && typeof agent === "string") {
               setSteps((prev) => [
@@ -140,6 +168,29 @@ function ChatPageContent() {
     }
   }
 
+  /** Approve/deny a parked destructive action; on approve, resume by replay. */
+  async function decide(id: string, decision: "approve" | "deny") {
+    if (streaming) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/approvals/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, by: "web-operator" }),
+      });
+      if (!res.ok) {
+        setError(`审批失败 HTTP ${res.status}`);
+        return;
+      }
+      setPending((prev) =>
+        prev ? { ...prev, items: prev.items.filter((it) => it.id !== id) } : prev,
+      );
+      if (decision === "approve") await send(); // resume-by-replay
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "审批请求失败");
+    }
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12">
       <h1 className="text-2xl font-semibold">Chat with ResolveAI</h1>
@@ -147,6 +198,53 @@ function ChatPageContent() {
       {error && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-sky-200">
+          {notice}
+        </div>
+      )}
+
+      {pending && pending.items.length > 0 && (
+        <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
+          <p className="text-sm font-medium text-amber-200">
+            需人工审批（Human-in-the-Loop）：{pending.items.length} 个高风险动作已挂起
+          </p>
+          <ul className="mt-3 space-y-3">
+            {pending.items.map((it) => (
+              <li key={it.id} className="rounded-md bg-background/60 p-3">
+                <div className="font-mono text-xs text-foreground/80">
+                  {it.tool}
+                  <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase text-amber-200">
+                    {it.capability}
+                  </span>
+                </div>
+                <pre className="mt-1 overflow-x-auto rounded bg-background/80 p-2 text-[11px] text-foreground/60">
+                  {JSON.stringify(it.args, null, 2)}
+                </pre>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decide(it.id, "approve")}
+                    disabled={streaming}
+                    className="rounded-md bg-emerald-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                  >
+                    批准并继续
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decide(it.id, "deny")}
+                    disabled={streaming}
+                    className="rounded-md bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                  >
+                    拒绝
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

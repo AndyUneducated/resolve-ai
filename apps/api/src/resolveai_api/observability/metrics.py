@@ -52,6 +52,10 @@ if _AVAILABLE:
         "resolveai_cost_budget_exceeded_total",
         "Runs whose modeled cost exceeded the per-ticket budget.",
     )
+    APPROVALS_PENDING = Counter(
+        "resolveai_approvals_pending_total",
+        "Destructive tool calls parked for human approval (M12 HITL gate).",
+    )
     COST_USD = Histogram(
         "resolveai_ticket_cost_usd", "Modeled per-ticket cost (USD).", buckets=_COST_BUCKETS
     )
@@ -76,6 +80,15 @@ def record_block(layer: str, kind: str) -> None:
         return
     TICKETS.labels(outcome="blocked").inc()
     GUARDRAIL_BLOCKS.labels(layer=layer, kind=kind).inc()
+
+
+def record_awaiting(pending: int = 1) -> None:
+    """Count one ticket parked for human approval (+ the # of parked actions)."""
+    if not _AVAILABLE:
+        return
+    TICKETS.labels(outcome="awaiting_approval").inc()
+    if pending > 0:
+        APPROVALS_PENDING.inc(pending)
 
 
 def record_done(
