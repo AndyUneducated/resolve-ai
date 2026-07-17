@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
+import uuid
 from collections.abc import AsyncIterator, Callable, MutableSequence
 from dataclasses import dataclass
 from typing import Literal
@@ -287,10 +288,36 @@ class SupervisorGraph:
             scrubbed, flags = await self.input_guard.scan_and_redact(message)
             guardrail_ms["input"] = (time.perf_counter() - _t0) * 1000.0
             all_flags = list(flags)
+            # Flywheel (M14): track final intent / escalation so terminal tickets
+            # can be sunk as candidate eval cases (PII-scrubbed, best-effort).
+            final_intent: str | None = None
+            escalated = False
+
+            def _sink(outcome: str, blocked_layer: str | None = None) -> None:
+                from resolveai_api.eval.pricing import trace_cost_usd
+                from resolveai_api.observability import trace_sink
+
+                trace_sink.record_ticket(
+                    {
+                        "id": uuid.uuid4().hex[:12],
+                        "query": scrubbed,
+                        "intent": final_intent,
+                        "outcome": outcome,
+                        "blocked_layer": blocked_layer,
+                        "flags": list(all_flags),
+                        "escalated": escalated,
+                        "tools": [c.tool for c in run_trace.tool_calls],
+                        "cost_usd": round(trace_cost_usd(run_trace), 6),
+                        "tokens": run_trace.total_tokens,
+                        "tenant_id": tenant_id,
+                    }
+                )
+
             kind = block_kind(flags, fail_closed=fail_closed)
             if kind is not BlockKind.NONE:
                 _emit_report(report_sink, all_flags)
                 prom_metrics.record_block("input", str(kind))
+                _sink("blocked", "input")
                 _set(ticket_span, "outcome", "blocked")
                 _set(ticket_span, "blocked_layer", "input")
                 _set(ticket_span, "blocked_kind", str(kind))
@@ -323,6 +350,12 @@ class SupervisorGraph:
             try:
                 async for event in self.graph.astream(initial, config=config):
                     for node_name, node_state in event.items():
+                        if isinstance(node_state, dict):
+                            summary = node_state.get("ticket_summary") or {}
+                            if isinstance(summary, dict) and summary.get("intent"):
+                                final_intent = str(summary["intent"])
+                            if node_name == "escalation":
+                                escalated = True
                         msgs = (
                             node_state.get("messages", [])
                             if isinstance(node_state, dict)
@@ -359,6 +392,7 @@ class SupervisorGraph:
                             if out_kind is not BlockKind.NONE:
                                 _emit_report(report_sink, all_flags)
                                 prom_metrics.record_block("output", str(out_kind))
+                                _sink("blocked", "output")
                                 _set(agent_span, "blocked", True)
                                 _set(ticket_span, "outcome", "blocked")
                                 _set(ticket_span, "blocked_layer", "output")
@@ -396,6 +430,7 @@ class SupervisorGraph:
                 all_flags.append("cross_tenant_blocked")
                 _emit_report(report_sink, all_flags)
                 prom_metrics.record_block("tenant_isolation", str(BlockKind.TRUE_POSITIVE))
+                _sink("blocked", "tenant_isolation")
                 _set(ticket_span, "outcome", "blocked")
                 _set(ticket_span, "blocked_layer", "tenant_isolation")
                 with span(
@@ -416,6 +451,7 @@ class SupervisorGraph:
                 _set(ticket_span, "outcome", "awaiting_approval")
                 _set(ticket_span, "pending_approvals", len(appr_ctx.pending))
                 prom_metrics.record_awaiting(len(appr_ctx.pending))
+                _sink("awaiting_approval")
                 yield {
                     "type": "awaiting_approval",
                     "data": json.dumps(
@@ -456,4 +492,5 @@ class SupervisorGraph:
             )
             _set(ticket_span, "total_tokens", metrics["tokens"])
             _set(ticket_span, "cost_usd", metrics["cost_usd"])
+            _sink("done")
             yield {"type": "done", "data": json.dumps(metrics, default=str)}

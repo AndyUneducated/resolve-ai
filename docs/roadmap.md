@@ -1,6 +1,6 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M13 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存）；**M14–M15 规划中**。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M14 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存 / Eval→数据飞轮）；**M15 规划中**。
 
 > **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
 > `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
@@ -42,8 +42,8 @@ flowchart LR
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
   class M1,M2,M3,M4,M6 base;
-  class M5,M7,M8,M9,M10,M11,M12,M13 star;
-  class M14,M15 plan;
+  class M5,M7,M8,M9,M10,M11,M12,M13,M14 star;
+  class M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -63,7 +63,7 @@ flowchart LR
 | **M11** | 可观测闭环 & 成本治理 | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + 成本预算熔断 + 成本回归门 | ✅ |
 | **M12** | Human-in-the-Loop 接力 | ⭐ | Executor 审批闸（destructive）+ approve/deny/edit API + `awaiting_approval` SSE + 坐席接管 | ✅ |
 | **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 检索回归门 + 语义缓存（tenant 隔离 + TTL）降本降延迟 | ✅ |
-| **M14** | Eval→数据飞轮 | ⭐ | 生产 trace 自动回灌 eval 集 + 回归门在线自改进 | 📋 |
+| **M14** | Eval→数据飞轮 | ⭐ | trace sink → 脱敏采样 → 版本化数据集 → 双跑分回归门 + 失败聚类 | ✅ |
 | **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错 + CI type gate + compose/K8s 一键起 | 📋 |
 
 > Phase 2 详细技术方案：[M10](milestone-10-plan.md) · [M11](milestone-11-plan.md) · [M12](milestone-12-plan.md) · [M13](milestone-13-plan.md) · [M14](milestone-14-plan.md) · [M15](milestone-15-plan.md)。
@@ -316,16 +316,18 @@ flowchart LR
 
 详细技术方案见 [`docs/milestone-13-plan.md`](milestone-13-plan.md)。
 
-## Milestone 14 · Eval→数据飞轮（在线自改进）（3-4 days）⭐ — 📋 Planned
+## Milestone 14 · Eval→数据飞轮（在线自改进）（3-4 days）⭐ — ✅ Done
 
 > **目标**：把 M5 的静态 eval 集升级为"生产 trace 自动回灌 eval、回归门在线自改进"的闭环 —— senior 级的"系统会自己变好"叙事。
 
 - **已落地地基**：M5 对抗 eval + judge/scoring；M8 `regression_gate.py` + OTel span；本次每请求 trace 带成本。
-- [ ] 生产 trace **采样 + 脱敏**（复用 Presidio）自动沉淀为候选 eval case
-- [ ] 人工/judge 标注回流，扩充 `red_team.jsonl` / `benchmark_tickets.jsonl`，形成版本化数据集
-- [ ] 在线回归门：新版本对**当前 + 新采集**的 case 跑分，回归即拦截发布
-- [ ] 失败案例聚类（按 intent / 护栏层 / tool），产出"最该修的 top-N"报表
-- [ ] 数据飞轮指标：随时间的 auto-resolve rate / 护栏漏检率曲线
+- [x] 生产 trace **best-effort sink**（`TRACE_SINK_PATH`，写时脱敏）+ `harvest_traces.py` **分层采样 + PII 脱敏**沉淀候选 case（残留 PII 即 exit 2）
+- [x] 版本化数据集 `data/eval/vN/`（`write_dataset_version` + provenance manifest）
+- [x] **双跑分**回归门：对 legacy + harvested 双集跑分，任一集回归即拦（`dual_score_gate`）
+- [x] 失败案例聚类（intent × 护栏层/escalate/tool）→ `reports/flywheel/top_failures.md`
+- [x] LM-free 单测锁定采样/脱敏/聚类/门禁 + e2e sink（`test_flywheel.py`，13 用例）
+
+> 进一步生产化（不在本次）：judge 预标+人工确认 CLI、质量曲线接 Grafana、sink→Kafka/对象存储。
 
 详细技术方案见 [`docs/milestone-14-plan.md`](milestone-14-plan.md)。
 

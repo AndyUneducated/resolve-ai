@@ -1,10 +1,10 @@
 # Milestone 14 — Eval→数据飞轮（在线自改进）
 
-**Status:** 📋 规划中。**地基已落地**：M5 对抗 eval + judge/scoring、M8 `scripts/regression_gate.py` + OTel span、本次加固的每请求 `capture_run` trace（token/成本/tool_calls）。
+**Status:** ✅ **已实现**（trace sink → 分层采样 → PII 脱敏 → 版本化数据集 → 双跑分回归门 → 失败聚类）。sink 默认关（`TRACE_SINK_PATH` 空），best-effort **绝不影响请求**。
 
 **Goal:** 把 M5 的静态 eval 集升级为「生产 trace 自动回灌 eval、回归门在线自改进」的闭环 —— senior 级的「系统会随流量自己变好、且退化会被自动拦」叙事。
 
-**Design principle:** 复用现有 eval harness、judge、pricing、trace，不另起炉灶；采样与脱敏复用 Presidio。
+**Design principle（诚实的取舍）：** 复用现有 trace/pricing/judge，不另起炉灶。飞轮全部为**纯函数 + 确定性**（seeded 采样、regex 脱敏、手写门禁数学），无需 LLM/DB/网络即可单测。脱敏用**轻量 regex**（快、可测；Presidio 是更重的生产选项，飞轮离线路径刻意不引）。「judge 预标 + 人工确认 CLI」「按数据集版本画质量曲线」列为进一步生产化（见 §6）。
 
 ```mermaid
 flowchart LR
@@ -35,20 +35,21 @@ flowchart LR
 2. 失败案例无**聚类归因**，不知道"最该修什么"。
 3. 没有随时间的质量曲线（auto-resolve rate、漏检率）。
 
-## 3. 技术方案
+## 3. 技术方案（已实现）
 
-### 3.1 Trace 采样 → 候选 case
-- `scripts/harvest_traces.py`：从 trace / report sink 采样（按 intent / 是否被拦 / 是否 escalate 分层），**Presidio 脱敏**后写入 `data/candidates/*.jsonl`。
+### 3.1 生产侧 trace sink
+- `observability/trace_sink.py`：`TRACE_SINK_PATH` 设置时，每个终态 ticket（done/blocked/awaiting）在 `Supervisor.stream` 各终点 append 一行 **PII 脱敏**的 JSON（best-effort，`try/except` 兜底绝不 500）。写入时再脱敏一次（防御纵深：L1 关也无 PII 落盘）。
 
-### 3.2 标注回流
-- judge 预标 + 人工确认（简易 CLI / notebook），确认后 append 到版本化数据集（`data/eval/vN/`）。
+### 3.2 采样 → 脱敏 → 候选
+- `eval/flywheel.py`：`stratified_sample`（按 `intent×outcome` 分层 + seeded，防「只采被拦的」偏置）、`scrub_text`/`find_pii`/`assert_no_pii`（email/卡号/SSN/电话/Stripe id）、`to_candidate`（脱敏 + 规整）。
+- `scripts/harvest_traces.py`：读 sink → 采样 → 脱敏 → `assert_no_pii` **硬门**（残留 PII 即非零退出）→ 写 `data/candidates/*.jsonl` + 失败聚类报表。
 
-### 3.3 在线回归门升级
-- 回归门对「当前基线 + 新采集 case」双跑分；新版本在任一集回归即拦发布。
-- 失败案例按 (intent, 护栏层, tool) 聚类，产出 `reports/flywheel/top_failures.md`。
+### 3.3 版本化数据集
+- `write_dataset_version` + `dataset_manifest`：写 `data/eval/vN/{cases.jsonl,manifest.json}`，manifest 记样本量 + intent/outcome/source 分布 + 失败聚类（provenance）。
 
-### 3.4 质量曲线
-- 按数据集版本记录 auto-resolve rate / 护栏漏检率 / 平均成本，画趋势图（接 M11 Grafana 或静态图）。
+### 3.4 双跑分回归门 + 失败聚类
+- `score_dataset`（auto_resolve_rate / guardrail_miss_rate / mean_cost_usd）+ `regression_violations` + `dual_score_gate`：对「legacy + harvested」**双集**跑分，任一集回归即 `gate_failed`（防只在新集过拟合）。
+- `cluster_failures` + `render_top_failures_md`：失败按 (intent, reason=护栏层/escalate/tool) 聚类，产 `reports/flywheel/top_failures.md`，直接指向「最该修什么」。
 
 ## 4. 生产化 & 行业对齐（review）
 
@@ -61,8 +62,16 @@ flowchart LR
 
 ## 5. 验收
 
-- [ ] 生产 trace 能自动沉淀为脱敏候选 case
-- [ ] 数据集版本化，新增 case 可回流
-- [ ] 回归门对新旧集双跑分，模拟退化用例被拦
-- [ ] top-N 失败聚类报表产出
-- [ ] 新增测试全绿，`ruff`/`mypy` 不新增错误
+- [x] 生产 trace 自动沉淀为**脱敏**候选 case（`trace_sink` + e2e `test_trace_sink_appends_scrubbed_record`：写时脱敏，`find_pii()==[]`）
+- [x] PII 零残留硬门（`assert_no_pii` + `test_fixture_candidates_have_zero_residual_pii`；harvest 残留即 exit 2）
+- [x] 数据集版本化 + provenance manifest（`write_dataset_version` / `dataset_manifest`）
+- [x] 回归门对新旧集**双跑分**，模拟退化用例被拦（`dual_score_gate` + `test_dual_score_gate_blocks_on_any_dataset`）
+- [x] top-N 失败聚类报表（`cluster_failures` + `render_top_failures_md`）
+- [x] 新增测试全绿（198 passed LM-free），`ruff` clean，`mypy src` 不新增错误（38→38）
+
+## 6. 进一步生产化（明确不在本次范围）
+
+- **标注回流**：judge 预标 + 人工确认 CLI/notebook，记录标注者/时间 + judge↔人工不一致率（judge 可信度）。
+- **质量曲线**：按数据集版本记 auto-resolve/漏检/成本趋势，接 M11 Grafana。
+- **重脱敏**：离线飞轮用 regex 脱敏；接 Presidio（M4）作二次核查可进一步降残留风险。
+- **sink 持久化**：文件 sink → Kafka/对象存储，跨副本聚合。

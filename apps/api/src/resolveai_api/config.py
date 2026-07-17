@@ -179,6 +179,10 @@ class Settings(BaseSettings):
     )
     otel_service_name: str = Field(default="resolveai-api", alias="OTEL_SERVICE_NAME")
     evalgate_endpoint: str = Field(default="", alias="EVALGATE_ENDPOINT")
+    # Eval→data flywheel (M14): when set, each terminal ticket appends a
+    # PII-scrubbed JSON line here (best-effort, never fails a request). Ops feeds
+    # this file to `scripts/harvest_traces.py`. Empty (default) = disabled.
+    trace_sink_path: str = Field(default="", alias="TRACE_SINK_PATH")
     # Per-ticket modeled-cost budget (USD). When a run's accrued cost exceeds this,
     # the vertical Plan-Execute / ReAct loop stops spending (protective degrade) and
     # the Supervisor flags `cost:budget_exceeded`. `<= 0` disables the breaker.
