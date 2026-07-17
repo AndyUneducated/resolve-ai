@@ -17,6 +17,12 @@ type PendingApproval = {
   args: Record<string, unknown>;
   status: string;
 };
+type RunMetrics = {
+  tokens?: number;
+  costUsd?: number;
+  overBudget: boolean;
+  guardrailLatencyMs?: Record<string, number>;
+};
 
 /** sse-starlette 使用 CRLF；用 `\n\n` 切事件前需归一化，否则会整包粘在一起、JSON 带 `\r` 解析失败。 */
 function splitSseEvents(raw: string): { events: string[]; rest: string } {
@@ -45,6 +51,10 @@ function ChatPageContent() {
     null,
   );
   const [notice, setNotice] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<RunMetrics | null>(null);
+  // Keep the in-flight request abortable so an unmount (navigation) cancels the
+  // stream instead of leaking a reader / calling setState on a dead component.
+  const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (presetApplied.current) return;
@@ -56,6 +66,8 @@ function ChatPageContent() {
     }
   }, [searchParams]);
 
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
   async function send() {
     if (!input.trim() || streaming) return;
     setStreaming(true);
@@ -63,9 +75,11 @@ function ChatPageContent() {
     setError(null);
     setPending(null);
     setNotice(null);
+    setMetrics(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const controller = new AbortController();
+    controllerRef.current = controller;
     const timeoutId = window.setTimeout(() => controller.abort(), 180_000);
 
     try {
@@ -94,62 +108,89 @@ function ChatPageContent() {
       const decoder = new TextDecoder();
       let buffer = "";
 
+      const handleEvent = (evt: string) => {
+        const lines = evt.split("\n");
+        const eventLine = lines.find((l) => l.startsWith("event:"));
+        const dataLine = lines.find((l) => l.startsWith("data:"));
+        if (!dataLine) return;
+        const eventName = eventLine?.replace(/^event:\s*/, "").trim() ?? "";
+        const jsonPart = dataLine.replace(/^data:\s*/, "").trim();
+        if (!jsonPart) return;
+        try {
+          const payload = JSON.parse(jsonPart) as Record<string, unknown>;
+          if (eventName === "blocked") {
+            const reason = Array.isArray(payload.reason)
+              ? (payload.reason as string[]).join(", ")
+              : String(payload.reason ?? "unknown reason");
+            const detail = [
+              payload.layer ? `layer=${String(payload.layer)}` : "",
+              payload.kind ? `kind=${String(payload.kind)}` : "",
+            ]
+              .filter(Boolean)
+              .join(", ");
+            setError(
+              `Request blocked by safety policy: ${reason}${detail ? ` (${detail})` : ""}`,
+            );
+            return;
+          }
+          if (eventName === "awaiting_approval") {
+            setPending({
+              threadRef: String(payload.thread_ref ?? ""),
+              items: Array.isArray(payload.pending)
+                ? (payload.pending as PendingApproval[])
+                : [],
+            });
+            return;
+          }
+          if (eventName === "human_owned") {
+            setNotice(
+              `该会话已被人工坐席接管（${String(payload.owner ?? "")}），自动化已暂停。`,
+            );
+            return;
+          }
+          if (eventName === "done") {
+            setMetrics({
+              tokens: typeof payload.tokens === "number" ? payload.tokens : undefined,
+              costUsd: typeof payload.cost_usd === "number" ? payload.cost_usd : undefined,
+              overBudget: Boolean(payload.over_budget),
+              guardrailLatencyMs:
+                payload.guardrail_latency_ms && typeof payload.guardrail_latency_ms === "object"
+                  ? (payload.guardrail_latency_ms as Record<string, number>)
+                  : undefined,
+            });
+            return;
+          }
+          const agent = payload.agent;
+          if (eventName === "agent_step" && typeof agent === "string") {
+            setSteps((prev) => [
+              ...prev,
+              {
+                agent,
+                content: String(payload.content ?? ""),
+                flags: Array.isArray(payload.flags) ? (payload.flags as string[]) : [],
+                toolCalls: Array.isArray(payload.tool_calls)
+                  ? (payload.tool_calls as ToolCall[])
+                  : [],
+              },
+            ]);
+          }
+        } catch {
+          /* ignore non-JSON / ping comments */
+        }
+      };
+
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        // Decode the terminal chunk too: some runtimes deliver the last bytes
+        // (often the `done` event) together with done=true.
+        if (value) buffer += decoder.decode(value, { stream: !done });
         const { events, rest } = splitSseEvents(buffer);
         buffer = rest;
-        for (const evt of events) {
-          const eventLine = evt.split("\n").find((l) => l.startsWith("event:"));
-          const dataLine = evt.split("\n").find((l) => l.startsWith("data:"));
-          if (!dataLine) continue;
-          const eventName = eventLine?.replace(/^event:\s*/, "").trim() ?? "";
-          const jsonPart = dataLine.replace(/^data:\s*/, "").trim();
-          if (!jsonPart) continue;
-          try {
-            const payload = JSON.parse(jsonPart) as Record<string, unknown>;
-            if (eventName === "blocked") {
-              const reason = Array.isArray(payload.reason)
-                ? (payload.reason as string[]).join(", ")
-                : String(payload.reason ?? "unknown reason");
-              setError(`Request blocked by safety policy: ${reason}`);
-              continue;
-            }
-            if (eventName === "awaiting_approval") {
-              setPending({
-                threadRef: String(payload.thread_ref ?? ""),
-                items: Array.isArray(payload.pending)
-                  ? (payload.pending as PendingApproval[])
-                  : [],
-              });
-              continue;
-            }
-            if (eventName === "human_owned") {
-              setNotice(
-                `该会话已被人工坐席接管（${String(payload.owner ?? "")}），自动化已暂停。`,
-              );
-              continue;
-            }
-            const agent = payload.agent;
-            if (eventName === "agent_step" && typeof agent === "string") {
-              setSteps((prev) => [
-                ...prev,
-                {
-                  agent,
-                  content: String(payload.content ?? ""),
-                  flags: Array.isArray(payload.flags)
-                    ? (payload.flags as string[])
-                    : [],
-                  toolCalls: Array.isArray(payload.tool_calls)
-                    ? (payload.tool_calls as ToolCall[])
-                    : [],
-                },
-              ]);
-            }
-          } catch {
-            /* ignore non-JSON / ping comments */
-          }
+        for (const evt of events) handleEvent(evt);
+        if (done) {
+          // Flush a trailing event that wasn't terminated by a blank line.
+          if (buffer.trim()) handleEvent(buffer);
+          break;
         }
       }
     } catch (e) {
@@ -164,6 +205,7 @@ function ChatPageContent() {
       }
     } finally {
       window.clearTimeout(timeoutId);
+      controllerRef.current = null;
       setStreaming(false);
     }
   }
@@ -333,6 +375,30 @@ function ChatPageContent() {
           </div>
         ))}
       </div>
+
+      {metrics && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground/70">
+          <span className="font-medium text-foreground/90">本次运行</span>
+          <span>
+            tokens: <code className="rounded bg-background/60 px-1">{metrics.tokens ?? "—"}</code>
+          </span>
+          <span>
+            cost:{" "}
+            <code className="rounded bg-background/60 px-1">
+              {typeof metrics.costUsd === "number" ? `$${metrics.costUsd.toFixed(4)}` : "—"}
+            </code>
+          </span>
+          {metrics.overBudget && (
+            <span className="rounded bg-red-500/20 px-2 py-0.5 text-red-300">over budget</span>
+          )}
+          {metrics.guardrailLatencyMs &&
+            Object.entries(metrics.guardrailLatencyMs).map(([layer, ms]) => (
+              <span key={`gl-${layer}`}>
+                {layer}: <code className="rounded bg-background/60 px-1">{ms}ms</code>
+              </span>
+            ))}
+        </div>
+      )}
     </main>
   );
 }

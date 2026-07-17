@@ -21,7 +21,6 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "apps" / "api" / "src") not in sys.path:
@@ -35,19 +34,10 @@ from resolveai_api.eval.flywheel import (  # noqa: E402
     to_candidate,
     write_dataset_version,
 )
+from resolveai_api.guardrails.eval_scoring import load_jsonl  # noqa: E402
 
 CANDIDATES_DIR = ROOT / "data" / "candidates"
 FLYWHEEL_REPORTS = ROOT / "reports" / "flywheel"
-
-
-def _load_jsonl(path: Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,7 +52,7 @@ def parse_args() -> argparse.Namespace:
 
 def run() -> int:
     args = parse_args()
-    records = _load_jsonl(args.input)
+    records = load_jsonl(args.input)
     sampled = stratified_sample(records, per_stratum=args.per_stratum, seed=args.seed)
     candidates = [to_candidate(r) for r in sampled]
 

@@ -13,11 +13,7 @@
   "dependencies": {
     "next": "^15.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.5.0",
-    "class-variance-authority": "^0.7.0",
-    "lucide-react": "^0.460.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",

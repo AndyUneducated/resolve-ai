@@ -33,7 +33,7 @@ from typing import Any
 from resolveai_api.config import get_settings
 from resolveai_api.core.checkpointer import lifespan_checkpointer
 from resolveai_api.core.executor import Executor
-from resolveai_api.eval.arch_scoring import build_summary, load_jsonl, render_markdown
+from resolveai_api.eval.arch_scoring import build_summary, render_markdown
 from resolveai_api.eval.judge import ResolutionJudge
 from resolveai_api.eval.preflight import check_ollama
 from resolveai_api.eval.pricing import trace_cost_usd
@@ -45,6 +45,7 @@ from resolveai_api.eval.variants import (
     VARIANTS,
     build_variant,
 )
+from resolveai_api.guardrails.eval_scoring import load_jsonl
 from resolveai_api.mcp.toolbelt import ToolBelt
 
 ROOT = Path(__file__).resolve().parents[1]

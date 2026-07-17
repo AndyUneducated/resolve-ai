@@ -71,16 +71,16 @@ def _sandbox_wrap(parts: list[str]) -> list[str]:
         return parts
 
     image = str(getattr(settings, "mcp_sandbox_image", "resolveai/mcp-servers:dev"))
-    docker_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-i",
-        "--network=none",
+    docker_cmd = ["docker", "run", "--rm", "-i"]
+    if str(getattr(settings, "sandbox_network", "none")).strip().lower() == "none":
+        docker_cmd.append("--network=none")
+    # Resource ceilings come from the SANDBOX_* config (single source of truth,
+    # shared with the guardrails SandboxPolicy) instead of hardcoded constants.
+    docker_cmd += [
         "--read-only",
         "--cap-drop=ALL",
-        "--pids-limit=64",
-        "--memory=512m",
+        f"--pids-limit={settings.sandbox_max_processes}",
+        f"--memory={settings.sandbox_memory_mb}m",
     ]
     if mode == "gvisor":
         docker_cmd.extend(["--runtime", settings.gvisor_runtime])

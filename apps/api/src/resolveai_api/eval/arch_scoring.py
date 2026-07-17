@@ -11,23 +11,11 @@ Consumes the per-(variant x ticket) JSONL rows emitted by
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 from resolveai_api.eval.variants import ABLATION_KEYS, COST_ROUTING_KEYS, VARIANTS
 
 _BAD_OUTCOMES = ("error", "timeout")
-
-
-def load_jsonl(path: Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
 
 
 def _percentile(values: list[float], pct: float) -> float:

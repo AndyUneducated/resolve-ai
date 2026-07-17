@@ -59,10 +59,22 @@ def find_pii(text: str) -> list[str]:
     return sorted({name for name, pattern, _ in _PII_PATTERNS if pattern.search(text)})
 
 
+# The gate scopes to *free-text* fields only. Structured fields (`flags`, `tools`,
+# `intent`, `outcome`) are controlled vocabulary and can legitimately contain
+# id-shaped tokens — e.g. a `hallucinated:ch_fake` guardrail flag embeds a fake
+# charge-id on purpose. Scanning those would raise false positives. If a NEW
+# free-text field is ever persisted in a candidate, add it here.
+_PII_SCAN_FIELDS: tuple[str, ...] = ("query",)
+
+
 def assert_no_pii(
-    records: Iterable[Mapping[str, Any]], *, fields: Sequence[str] = ("query",)
+    records: Iterable[Mapping[str, Any]], *, fields: Sequence[str] = _PII_SCAN_FIELDS
 ) -> list[str]:
-    """CI hard gate: return violations for any residual PII in `fields`."""
+    """CI hard gate: return violations for any residual PII in the free-text fields.
+
+    See `_PII_SCAN_FIELDS` for why this is intentionally scoped rather than scanning
+    every value.
+    """
     violations: list[str] = []
     for record in records:
         for field in fields:

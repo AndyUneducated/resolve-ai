@@ -63,8 +63,23 @@ class SandboxPolicy:
 
     @classmethod
     def for_capability(cls, capability: str, **overrides: object) -> SandboxPolicy:
-        """Stricter budget for gated (write/destructive) tools than for reads."""
-        base = cls()
+        """Stricter budget for gated (write/destructive) tools than for reads.
+
+        The base budget is sourced from `Settings` (the `SANDBOX_*` env knobs) so the
+        documented config is actually authoritative instead of dead. Env-unset values
+        equal the dataclass defaults, so this is behaviour-preserving out of the box.
+        """
+        from resolveai_api.config import get_settings
+
+        s = get_settings()
+        base = cls(
+            cpu_seconds=s.sandbox_cpu_seconds,
+            memory_mb=s.sandbox_memory_mb,
+            wall_timeout_s=s.sandbox_wall_timeout_s,
+            max_processes=s.sandbox_max_processes,
+            max_file_bytes=s.sandbox_max_file_mb * 1024 * 1024,
+            network=s.sandbox_network,
+        )
         if capability in ("write", "destructive"):
             base.cpu_seconds = min(base.cpu_seconds, 5)
             base.wall_timeout_s = min(base.wall_timeout_s, 10.0)
