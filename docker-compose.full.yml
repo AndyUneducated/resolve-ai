@@ -1,0 +1,81 @@
+# ResolveAI · one-click full stack (M15).
+#
+#   docker compose -f docker-compose.full.yml up --build      # postgres + api + web
+#   docker compose -f docker-compose.full.yml --profile seed up seed   # (opt-in) KB seed
+#   docker compose -f docker-compose.full.yml --profile obs  up        # + OTel/Tempo/Prom/Grafana
+#
+# Reuses the base file (postgres + observability stack, image tags pinned there)
+# via `include`, then layers the built API + web images on top with health-gated
+# startup ordering (web waits for api healthy, api waits for postgres healthy).
+include:
+  - docker-compose.yml
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: resolveai-api:local
+    container_name: resolveai-api
+    environment:
+      # Admin DSN (migrations / seed / LangGraph checkpoint setup).
+      DATABASE_URL: postgresql+psycopg://resolveai:resolveai@postgres:5432/resolveai
+      # Low-privilege tenant-scoped DSN → RLS actually enforced (M9). Role +
+      # password come from infra/docker/migrations/0001_rls.sql (auto-applied on
+      # a fresh postgres volume).
+      APP_DATABASE_URL: postgresql+psycopg://resolveai_app:resolveai_app@postgres:5432/resolveai
+      CHECKPOINT_BACKEND: postgres
+      API_CORS_ORIGINS: http://localhost:3000
+      # Default to the deterministic fake backend so the stack boots with ZERO
+      # model downloads. For live inference, run Ollama on the host and start with:
+      #   LLM_BACKEND=ollama EMBEDDING_BACKEND=ollama docker compose -f docker-compose.full.yml up
+      LLM_BACKEND: ${LLM_BACKEND:-fake}
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-ollama}
+      APPROVAL_MODE: ${APPROVAL_MODE:-off}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the browser bundle → must be the HOST-reachable API URL.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    image: resolveai-web:local
+    container_name: resolveai-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Opt-in KB seed (`--profile seed`). Requires a reachable embedding backend
+  # (Ollama bge-m3 by default) — the fake backend has no embedder, so seeding is
+  # NOT part of the default `up`. One-shot; exits after loading FAQ/runbook docs.
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: resolveai-api:local
+    container_name: resolveai-seed
+    profiles: ["seed"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://resolveai:resolveai@postgres:5432/resolveai
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["uv", "run", "--no-sync", "python", "scripts/seed_db.py"]
+    restart: "no"

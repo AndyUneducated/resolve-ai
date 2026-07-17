@@ -114,7 +114,7 @@ def build_layer_attribution(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
 def build_ablation_table(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     profiles = ["baseline", "ablate_l1", "ablate_l3", "ablate_l4"]
     ran_profiles = {str(row.get("profile")) for row in rows}
-    output: list[dict[str, str]] = []
+    output: list[dict[str, Any]] = []
     for profile in profiles:
         if profile not in ran_profiles:
             # Profile was never executed in this run. Emitting "0.0%" here would

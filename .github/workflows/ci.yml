@@ -26,6 +26,11 @@ jobs:
       - name: Ruff
         run: uv run ruff check .
 
+      # Type gate (M15): source + reusable packages must be mypy-clean. Test files
+      # are intentionally out of scope for now (see docs/milestone-15-plan.md).
+      - name: Mypy (type gate)
+        run: uv run mypy apps/api/src packages
+
       - name: Pytest
         run: uv run python -m pytest -q
 

@@ -1,5 +1,10 @@
 .PHONY: help install dev api web seed db-migrate test red-team lint fmt typecheck clean \
-	chaos regression-gate demo-assets demo-record obs obs-down metrics
+	chaos regression-gate demo-assets demo-record obs obs-down metrics \
+	stack-up stack-down stack-logs smoke
+
+# Full-stack compose file (M15 one-click deploy). Base file (docker-compose.yml)
+# is pulled in via `include:`.
+FULL_STACK ?= docker-compose.full.yml
 
 # Owner/superuser DSN for DDL (RLS migration). resolveai_app lacks DDL rights, so
 # this must run as the owner. Override for a remote/CI DB: make db-migrate MIGRATE_DSN=...
@@ -22,9 +27,13 @@ help:
 	@echo "  obs             启动可观测栈：OTel collector + Tempo + Prometheus + Grafana（--profile obs）"
 	@echo "  obs-down        拆掉可观测栈"
 	@echo "  metrics         curl 本地 /metrics（需先 make api）"
+	@echo "  stack-up        一键起全栈（postgres + api + web，M15；首次会 build 镜像）"
+	@echo "  stack-down      拆掉全栈"
+	@echo "  stack-logs      跟随全栈日志"
+	@echo "  smoke           对已起的全栈跑冒烟（health + web + chat 往返）"
 	@echo "  lint            ruff + eslint"
 	@echo "  fmt             ruff format + prettier"
-	@echo "  typecheck       mypy + tsc"
+	@echo "  typecheck       mypy（source + packages，与 CI 门禁同口径）+ tsc"
 
 install:
 	uv sync
@@ -81,6 +90,25 @@ obs:
 obs-down:
 	docker compose --profile obs down
 
+stack-up:
+	# One-click full stack (M15): postgres + api + web, health-gated startup.
+	# First run builds the api/web images (heavy). Defaults to LLM_BACKEND=fake so
+	# it boots with zero model downloads — override for live inference:
+	#   make stack-up LLM_BACKEND=ollama EMBEDDING_BACKEND=ollama
+	docker compose -f $(FULL_STACK) up --build -d
+	@echo "→ api  http://localhost:8000/docs"
+	@echo "→ web  http://localhost:3000"
+	@echo "  (optional KB seed — needs Ollama: docker compose -f $(FULL_STACK) --profile seed up seed)"
+
+stack-down:
+	docker compose -f $(FULL_STACK) down
+
+stack-logs:
+	docker compose -f $(FULL_STACK) logs -f
+
+smoke:
+	./scripts/smoke.sh
+
 metrics:
 	@curl -s http://localhost:8000/metrics | grep -E '^resolveai_' || \
 		echo "no resolveai_* metrics yet (run some tickets), or API not up (make api)"
@@ -94,7 +122,9 @@ fmt:
 	cd apps/web && npm run format || true
 
 typecheck:
-	uv run mypy apps/api packages
+	# Same scope as the CI type gate (.github/workflows/ci.yml): source + packages
+	# must be mypy-clean. Test files are out of scope for now (see M15 plan).
+	uv run mypy apps/api/src packages
 	cd apps/web && npx tsc --noEmit
 
 clean:

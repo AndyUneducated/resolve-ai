@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -34,7 +35,7 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
         self._inner = inner
         self._enabled = enabled
 
-    def _assert_namespace(self, config: dict[str, Any] | None) -> None:
+    def _assert_namespace(self, config: RunnableConfig | None) -> None:
         if not self._enabled:
             return
         if not config:
@@ -51,7 +52,9 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
             except PermissionError as exc:
                 raise CrossTenantAccessBlockedError(str(exc)) from exc
 
-    def _assert_tuple_namespace(self, checkpoint_tuple: object, config: dict[str, Any]) -> None:
+    def _assert_tuple_namespace(
+        self, checkpoint_tuple: object, config: RunnableConfig
+    ) -> None:
         if not self._enabled:
             return
         if checkpoint_tuple is None:
@@ -74,13 +77,13 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
             except PermissionError as exc:
                 raise CrossTenantAccessBlockedError(str(exc)) from exc
 
-    def get_tuple(self, config: dict[str, Any]) -> Any:
+    def get_tuple(self, config: RunnableConfig) -> Any:
         self._assert_namespace(config)
         checkpoint_tuple = self._inner.get_tuple(config)
         self._assert_tuple_namespace(checkpoint_tuple, config)
         return checkpoint_tuple
 
-    async def aget_tuple(self, config: dict[str, Any]) -> Any:
+    async def aget_tuple(self, config: RunnableConfig) -> Any:
         self._assert_namespace(config)
         checkpoint_tuple = await self._inner.aget_tuple(config)
         self._assert_tuple_namespace(checkpoint_tuple, config)
@@ -88,30 +91,30 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
 
     def put(
         self,
-        config: dict[str, Any],
+        config: RunnableConfig,
         checkpoint: Any,
         metadata: Any,
         new_versions: Any,
-    ) -> dict[str, Any]:
+    ) -> RunnableConfig:
         self._assert_namespace(config)
         return self._inner.put(config, checkpoint, metadata, new_versions)
 
     async def aput(
         self,
-        config: dict[str, Any],
+        config: RunnableConfig,
         checkpoint: Any,
         metadata: Any,
         new_versions: Any,
-    ) -> dict[str, Any]:
+    ) -> RunnableConfig:
         self._assert_namespace(config)
         return await self._inner.aput(config, checkpoint, metadata, new_versions)
 
     def list(
         self,
-        config: dict[str, Any] | None,
+        config: RunnableConfig | None,
         *,
         filter: dict[str, Any] | None = None,
-        before: dict[str, Any] | None = None,
+        before: RunnableConfig | None = None,
         limit: int | None = None,
     ) -> Iterator[Any]:
         self._assert_namespace(config)
@@ -122,7 +125,7 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
 
     def put_writes(
         self,
-        config: dict[str, Any],
+        config: RunnableConfig,
         writes: Sequence[tuple[str, Any]],
         task_id: str,
         task_path: str = "",
@@ -132,10 +135,10 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
 
     async def alist(
         self,
-        config: dict[str, Any] | None,
+        config: RunnableConfig | None,
         *,
         filter: dict[str, Any] | None = None,
-        before: dict[str, Any] | None = None,
+        before: RunnableConfig | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[Any]:
         self._assert_namespace(config)
@@ -148,7 +151,7 @@ class IsolatedCheckpointer(BaseCheckpointSaver):
 
     async def aput_writes(
         self,
-        config: dict[str, Any],
+        config: RunnableConfig,
         writes: Sequence[tuple[str, Any]],
         task_id: str,
         task_path: str = "",

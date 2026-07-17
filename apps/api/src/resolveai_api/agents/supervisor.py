@@ -99,11 +99,13 @@ def _build_agents(
     }
 
 
-def _route_after_triage(state: GraphState) -> Literal["billing", "technical", "escalation", END]:
+def _route_after_triage(state: GraphState) -> str:
+    # Returns a node name or END (a str sentinel); `str` avoids the invalid
+    # `Literal[..., END]` while still matching the conditional-edge mapping.
     summary = state.get("ticket_summary", {})
     intent = summary.get("intent", "other")
     if intent in ("billing", "technical", "escalation"):
-        return intent  # type: ignore[return-value]
+        return str(intent)
     return END
 
 
@@ -204,10 +206,10 @@ class SupervisorGraph:
     def _build_graph(self):
         builder: StateGraph = StateGraph(GraphState)
 
-        builder.add_node("triage", self.agents["triage"].run)  # type: ignore[attr-defined]
-        builder.add_node("billing", self.agents["billing"].run)  # type: ignore[attr-defined]
-        builder.add_node("technical", self.agents["technical"].run)  # type: ignore[attr-defined]
-        builder.add_node("escalation", self.agents["escalation"].run)  # type: ignore[attr-defined]
+        builder.add_node("triage", self.agents["triage"].run)
+        builder.add_node("billing", self.agents["billing"].run)
+        builder.add_node("technical", self.agents["technical"].run)
+        builder.add_node("escalation", self.agents["escalation"].run)
 
         builder.add_edge(START, "triage")
         builder.add_conditional_edges(

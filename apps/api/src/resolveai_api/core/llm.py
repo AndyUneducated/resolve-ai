@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel
@@ -37,7 +38,8 @@ def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
 
     settings = get_settings()
     model = _model_name(tier)
-    callbacks = [tier_callback(tier)]
+    # Typed as the base handler so the (invariant) `callbacks` param accepts it.
+    callbacks: list[BaseCallbackHandler] = [tier_callback(tier)]
 
     if settings.llm_backend == "fake":
         from resolveai_api.core._fake_llm import FakeChatModel
@@ -57,7 +59,11 @@ def make_llm(tier: LLMTier, *, temperature: float = 0.0) -> BaseChatModel:
     if settings.llm_backend == "anthropic":
         from langchain_anthropic import ChatAnthropic
 
-        return ChatAnthropic(model=model, temperature=temperature, callbacks=callbacks)
+        # `model` is accepted at runtime (alias of model_name); the stub only
+        # declares model_name, hence the targeted ignore.
+        return ChatAnthropic(  # type: ignore[call-arg]
+            model=model, temperature=temperature, callbacks=callbacks
+        )
 
     raise ValueError(
         f"Unsupported LLM_BACKEND={settings.llm_backend!r}; expected 'ollama' | 'anthropic' | 'fake'."

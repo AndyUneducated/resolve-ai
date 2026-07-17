@@ -1,0 +1,27 @@
+# Keep the Docker build context small + reproducible (M15).
+.git
+.github
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+htmlcov
+
+# Node — rebuilt inside the web image via `npm ci`.
+apps/web/node_modules
+apps/web/.next
+apps/web/out
+apps/web/demo/output
+
+# Local env / secrets — never bake into an image.
+.env
+.env.*
+!.env.example
+
+# Docs / media that don't affect the build.
+docs/assets
+**/*.webm

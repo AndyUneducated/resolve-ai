@@ -92,7 +92,9 @@ def _sandbox_wrap(parts: list[str]) -> list[str]:
 def build_client(servers: list[McpServerSpec] | None = None) -> MultiServerMCPClient:
     """Build a MultiServerMCPClient from registry specs (filtered to stdio for now)."""
     specs = servers or default_servers()
-    connections = {
+    # dict[str, Any]: MultiServerMCPClient expects a union of connection types;
+    # we only build StdioConnection, so widen to Any to satisfy the invariant param.
+    connections: dict[str, Any] = {
         spec.name: _spec_to_connection(spec)
         for spec in specs
         if spec.transport == "stdio"

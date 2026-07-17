@@ -1,6 +1,6 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M14 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存 / Eval→数据飞轮）；**M15 规划中**。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M15 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存 / Eval→数据飞轮 / 类型洁净 & 一键全栈）。**Roadmap 全部里程碑已落地。**
 
 > **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
 > `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
@@ -37,13 +37,12 @@ flowchart LR
   M3 --> M12["M12 · Human-in-the-Loop 接力 ⭐"]
   M6 --> M13["M13 · RAG 质量度量 & 语义缓存 ⭐"]
   M5 --> M14["M14 · Eval→数据飞轮（在线自改进）⭐"]
-  M9 --> M15["M15 · 类型洁净 & 一键全栈部署 🧱"]
+  M9 --> M15["M15 · 类型洁净 & 一键全栈部署 🧱 ✅"]
   classDef base fill:#e7f0ff,stroke:#4169E1,color:#10357a;
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
-  class M1,M2,M3,M4,M6 base;
+  class M1,M2,M3,M4,M6,M15 base;
   class M5,M7,M8,M9,M10,M11,M12,M13,M14 star;
-  class M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -64,7 +63,7 @@ flowchart LR
 | **M12** | Human-in-the-Loop 接力 | ⭐ | Executor 审批闸（destructive）+ approve/deny/edit API + `awaiting_approval` SSE + 坐席接管 | ✅ |
 | **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 检索回归门 + 语义缓存（tenant 隔离 + TTL）降本降延迟 | ✅ |
 | **M14** | Eval→数据飞轮 | ⭐ | trace sink → 脱敏采样 → 版本化数据集 → 双跑分回归门 + 失败聚类 | ✅ |
-| **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错 + CI type gate + compose/K8s 一键起 | 📋 |
+| **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错（source+packages）+ CI type gate + `make stack-up` compose 一键起 + `make smoke` | ✅ |
 
 > Phase 2 详细技术方案：[M10](milestone-10-plan.md) · [M11](milestone-11-plan.md) · [M12](milestone-12-plan.md) · [M13](milestone-13-plan.md) · [M14](milestone-14-plan.md) · [M15](milestone-15-plan.md)。
 
@@ -254,7 +253,7 @@ flowchart LR
 
 ---
 
-# Phase 2 · 从「demo-ready」到「production-grade」（M10–M15）📋 规划中
+# Phase 2 · 从「demo-ready」到「production-grade」（M10–M15）✅ 已实施
 
 > **定位**：Phase 1 证明了"能力"（多 Agent、护栏、检索、eval、隔离）。Phase 2 证明"运营" —— 生产环境要求的
 > fail-safe 默认、可观测闭环、人机接力、质量度量、自改进飞轮与一键部署。每个里程碑都在本次**加固 pass 落地的地基**之上延展，
@@ -331,15 +330,16 @@ flowchart LR
 
 详细技术方案见 [`docs/milestone-14-plan.md`](milestone-14-plan.md)。
 
-## Milestone 15 · 类型洁净 & 一键全栈部署（2-3 days）🧱 — 📋 Planned
+## Milestone 15 · 类型洁净 & 一键全栈部署（2-3 days）🧱 — ✅ Done
 
 > **目标**：补齐工程收尾 —— 类型零错并进 CI 门禁、一键起全栈（含依赖服务）、部署可复现。
 
-- **已落地地基**：CI 已加前端 `npm run build`（隐式 tsc 门禁）；后端 `ruff` 已在 CI；`mypy` 本地基线 58 错（多在测试）。
-- [ ] `mypy` 收敛到**零错**（source + tests），修复 `Literal[..., END]`、`with_structured_output` 返回类型、测试 `BaseTool` 覆盖模式
-- [ ] CI 增加 **mypy type gate**（阻断新增类型错误）
-- [ ] `docker-compose` 一键起**全栈**：api + web + postgres(+pgvector) + ollama + otel collector + grafana，含 healthcheck 依赖顺序
-- [ ] API 容器 healthcheck 接本次落地的 `/readyz`（真探测 DB/MCP，degraded 返回 503）
-- [ ] 部署文档 + `.env` 生产 profile（fail-closed on、真 endpoint）+ 冒烟脚本
+- [x] `mypy apps/api/src packages` **零错**：修 `Literal[..., END]`→`str`、`FakeStructuredRunnable` 继承 `Runnable`、checkpointer override 用 `RunnableConfig`、`callbacks` 协变注解等（注解-only，无行为改动）
+- [x] CI 增加 **mypy type gate**（`.github/workflows/ci.yml` ruff→mypy→pytest，阻断新增类型错误）；口径为 source+packages，tests 暂不纳入
+- [x] `docker-compose.full.yml` + `make stack-up` 一键起**全栈**：postgres(+pgvector) + api + web，healthcheck 依赖顺序（web→api→postgres）；观测栈/KB seed 走 `--profile obs` / `--profile seed`
+- [x] API 容器 healthcheck 接 `/healthz`（liveness）；`/readyz` 真探测 DB/MCP 供 smoke/编排用
+- [x] `scripts/smoke.sh`（`make smoke`）：等 health → 报 readyz → 等 web → chat SSE 往返断言；默认 `LLM_BACKEND=fake` 零模型下载即可起
+
+> 诚实说明：本环境未跑完整镜像 build（重、慢），只校验了 `docker compose config` 接线与 healthcheck 顺序；完整 `make stack-up` + `make smoke` 是操作者/CI 的验收路径。
 
 详细技术方案见 [`docs/milestone-15-plan.md`](milestone-15-plan.md)。

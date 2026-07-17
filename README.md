@@ -255,6 +255,22 @@ make dev
 # 前端: http://localhost:3000
 ```
 
+### 3′. 一键全栈（M15，容器化）
+
+不想手动分别起服务，可用一条命令拉起 **postgres + api + web**（healthcheck 顺序编排，首次会 build 镜像）：
+
+```bash
+make stack-up        # docker compose -f docker-compose.full.yml up --build -d
+# api: http://localhost:8000/docs   web: http://localhost:3000
+make smoke           # 端到端冒烟：health + web + chat SSE 往返
+make stack-down      # 拆栈
+```
+
+- **默认 `LLM_BACKEND=fake`**：零模型下载即可起，chat 走确定性 canned 应答。要真推理时在宿主起 Ollama 后：
+  `make stack-up LLM_BACKEND=ollama EMBEDDING_BACKEND=ollama`（容器经 `host.docker.internal` 连宿主）。
+- **KB 灌库**（需 Ollama embedder，故为可选 profile）：`docker compose -f docker-compose.full.yml --profile seed up seed`。
+- **观测栈**（OTel + Tempo + Prometheus + Grafana）：`docker compose -f docker-compose.full.yml --profile obs up`。
+
 ### 4. 跑红队测试
 
 ```bash

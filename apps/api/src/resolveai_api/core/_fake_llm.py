@@ -25,6 +25,7 @@ from langchain_core.callbacks import (
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.runnables import Runnable, RunnableConfig
 
 _CANNED_ANSWER = "Refund of the disputed charge has been processed. Anything else I can help with?"
 
@@ -175,7 +176,7 @@ def _dummy_for(annotation: Any) -> Any:
     return ""
 
 
-class FakeStructuredRunnable:
+class FakeStructuredRunnable(Runnable[Any, Any]):
     """Stands in for `make_llm(...).with_structured_output(schema)`."""
 
     def __init__(self, schema: type) -> None:
@@ -188,8 +189,12 @@ class FakeStructuredRunnable:
             return self._schema(**kwargs)
         return _generic_instance(self._schema)
 
-    def invoke(self, input_value: Any, config: Any = None, **kwargs: Any) -> Any:
-        return self._build(input_value)
+    def invoke(
+        self, input: Any, config: RunnableConfig | None = None, **kwargs: Any
+    ) -> Any:
+        return self._build(input)
 
-    async def ainvoke(self, input_value: Any, config: Any = None, **kwargs: Any) -> Any:
-        return self._build(input_value)
+    async def ainvoke(
+        self, input: Any, config: RunnableConfig | None = None, **kwargs: Any
+    ) -> Any:
+        return self._build(input)
