@@ -31,6 +31,8 @@ class RetrievalTrace:
     result_ids: list[int] = field(default_factory=list)
     latency_ms: float = 0.0
     reranked: bool = False
+    cache_hit: bool = False
+    """M13 semantic cache — True when the result was served from the cache."""
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -43,4 +45,5 @@ class RetrievalTrace:
             "result_ids": self.result_ids,
             "latency_ms": round(self.latency_ms, 2),
             "reranked": self.reranked,
+            "cache_hit": self.cache_hit,
         }

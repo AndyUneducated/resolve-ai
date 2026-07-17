@@ -56,6 +56,12 @@ if _AVAILABLE:
         "resolveai_approvals_pending_total",
         "Destructive tool calls parked for human approval (M12 HITL gate).",
     )
+    CACHE_HITS = Counter(
+        "resolveai_cache_hits_total", "Semantic-cache hits on KB retrieval (M13)."
+    )
+    CACHE_MISSES = Counter(
+        "resolveai_cache_misses_total", "Semantic-cache misses on KB retrieval (M13)."
+    )
     COST_USD = Histogram(
         "resolveai_ticket_cost_usd", "Modeled per-ticket cost (USD).", buckets=_COST_BUCKETS
     )
@@ -89,6 +95,16 @@ def record_awaiting(pending: int = 1) -> None:
     TICKETS.labels(outcome="awaiting_approval").inc()
     if pending > 0:
         APPROVALS_PENDING.inc(pending)
+
+
+def record_cache_hit() -> None:
+    if _AVAILABLE:
+        CACHE_HITS.inc()
+
+
+def record_cache_miss() -> None:
+    if _AVAILABLE:
+        CACHE_MISSES.inc()
 
 
 def record_done(

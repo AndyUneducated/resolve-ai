@@ -162,6 +162,17 @@ class Settings(BaseSettings):
         default="BAAI/bge-reranker-v2-m3", alias="RERANKER_MODEL"
     )
 
+    # ---------- Semantic cache (M13) ----------
+    semantic_cache_enabled: str = Field(default="off", alias="SEMANTIC_CACHE_ENABLED")
+    """on | off（默认）— on 时对 KB 检索做 embedding 近邻语义缓存（降 DB 往返 +
+    rerank 计算）。默认 off，检索路径与 M13 前逐字节一致。"""
+    semantic_cache_threshold: float = Field(default=0.95, alias="SEMANTIC_CACHE_THRESHOLD")
+    """余弦相似度阈值；≥ 该值判定语义命中（越高越保守，越不易串答案）。"""
+    semantic_cache_ttl_s: float = Field(default=3600.0, alias="SEMANTIC_CACHE_TTL_S")
+    """缓存条目 TTL（秒），过期即失效防陈旧。<=0 表示不过期。"""
+    semantic_cache_max_entries: int = Field(default=512, alias="SEMANTIC_CACHE_MAX_ENTRIES")
+    """每进程缓存容量上限；超出按最旧淘汰（LRU-ish）。"""
+
     # ---------- Observability ----------
     otel_endpoint: str = Field(
         default="http://localhost:4318", alias="OTEL_EXPORTER_OTLP_ENDPOINT"

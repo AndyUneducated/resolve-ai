@@ -22,6 +22,7 @@ from resolveai_api.config import get_settings
 from resolveai_api.guardrails.attribution import flag_enabled
 from resolveai_api.retrieval.fusion import reciprocal_rank_fusion
 from resolveai_api.retrieval.reranker import Reranker
+from resolveai_api.retrieval.semantic_cache import SemanticCache
 from resolveai_api.retrieval.store import KbStore
 from resolveai_api.retrieval.types import RetrievalTrace, RetrievedDoc
 
@@ -76,6 +77,7 @@ class HybridRetriever:
         profile: str | None = None,
         candidate_k: int | None = None,
         rrf_k: int | None = None,
+        cache: SemanticCache | None = None,
     ) -> None:
         settings = get_settings()
         self._embedder = embedder
@@ -87,6 +89,16 @@ class HybridRetriever:
         self._profile = profile or settings.retrieval_profile
         self._candidate_k = candidate_k or settings.retrieval_candidate_k
         self._rrf_k = rrf_k or settings.retrieval_rrf_k
+        # Semantic cache (M13): injected for tests, else the process-wide singleton
+        # when SEMANTIC_CACHE_ENABLED=on. None → caching disabled (default path).
+        if cache is not None:
+            self._cache: SemanticCache | None = cache
+        elif flag_enabled(getattr(settings, "semantic_cache_enabled", "off")):
+            from resolveai_api.retrieval.semantic_cache import get_semantic_cache
+
+            self._cache = get_semantic_cache()
+        else:
+            self._cache = None
 
     @property
     def reranker_status(self) -> str:
@@ -137,9 +149,35 @@ class HybridRetriever:
         )
         with span_cm as span:
             try:
+                # Semantic cache (M13): embed once up-front, reuse the vector for
+                # both the cache lookup and (on miss) the dense round-trip.
+                query_embedding: list[float] | None = None
+                if self._cache is not None:
+                    query_embedding = await self._get_embedder().aembed_query(query)
+                    lookup = self._cache.get(
+                        tenant_id=tenant_id, embedding=query_embedding
+                    )
+                    if lookup.hit:
+                        docs = list(lookup.value)[:k]
+                        trace.cache_hit = True
+                        trace.result_ids = [d.id for d in docs]
+                        return docs, trace
+
                 docs = await self._run(
-                    query=query, tenant_id=tenant_id, k=k, rrf_k=rrf_k, trace=trace
+                    query=query,
+                    tenant_id=tenant_id,
+                    k=k,
+                    rrf_k=rrf_k,
+                    trace=trace,
+                    query_embedding=query_embedding,
                 )
+                if self._cache is not None and query_embedding is not None:
+                    self._cache.put(
+                        tenant_id=tenant_id,
+                        embedding=query_embedding,
+                        value=docs,
+                        query=query,
+                    )
             finally:
                 trace.latency_ms = (time.perf_counter() - start) * 1000.0
                 _annotate_span(span, trace)
@@ -154,9 +192,12 @@ class HybridRetriever:
         k: int,
         rrf_k: int,
         trace: RetrievalTrace,
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedDoc]:
         async def _dense() -> list[RetrievedDoc]:
-            embedding = await self._get_embedder().aembed_query(query)
+            embedding = query_embedding
+            if embedding is None:
+                embedding = await self._get_embedder().aembed_query(query)
             return await self._store.dense_search(
                 query_embedding=embedding, tenant_id=tenant_id, k=self._candidate_k
             )

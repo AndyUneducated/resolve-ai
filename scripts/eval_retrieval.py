@@ -31,6 +31,7 @@ from resolveai_api.retrieval.hybrid import HybridRetriever  # noqa: E402
 from resolveai_api.retrieval.metrics import (  # noqa: E402
     aggregate,
     mrr_at_k,
+    ndcg_at_k,
     proportional_recall_at_k,
     recall_at_k,
 )
@@ -88,6 +89,7 @@ async def eval_profile(
             f"recall@{k}": recall_at_k(retrieved_ids, expected_ids, k=k),
             f"prop_recall@{k}": proportional_recall_at_k(retrieved_ids, expected_ids, k=k),
             f"mrr@{k}": mrr_at_k(retrieved_ids, expected_ids, k=k),
+            f"ndcg@{k}": ndcg_at_k(retrieved_ids, expected_ids, k=k),
         }
         per_case.append(case_metrics)
         details.append(
@@ -109,12 +111,68 @@ async def eval_profile(
     }
 
 
+def render_quality_markdown(results: list[dict[str, Any]], *, k: int) -> str:
+    """Pure renderer: a profile × metric table for `reports/retrieval/quality.md`.
+
+    Kept side-effect free so it is unit-testable without a DB / embeddings.
+    """
+    metric_keys = [f"recall@{k}", f"prop_recall@{k}", f"mrr@{k}", f"ndcg@{k}"]
+    lines = [
+        "# Retrieval quality (M13)",
+        "",
+        f"Golden set metrics at k={k}. nDCG@k rewards ranking relevant docs higher, "
+        "so it best quantifies the rerank payoff.",
+        "",
+        "| profile | reranker | " + " | ".join(metric_keys) + " |",
+        "|---|---|" + "|".join(["---"] * len(metric_keys)) + "|",
+    ]
+    for result in results:
+        agg = result.get("aggregate", {})
+        cells = " | ".join(f"{float(agg.get(key, 0.0)):.3f}" for key in metric_keys)
+        lines.append(
+            f"| {result.get('profile')} | {result.get('reranker_status')} | {cells} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def check_retrieval_regression(
+    current: dict[str, float],
+    baseline: dict[str, float],
+    *,
+    k: int,
+    max_drop_pct: float = 5.0,
+) -> list[str]:
+    """Retrieval regression gate: nDCG@k / recall@k must not drop > max_drop_pct.
+
+    Pure + unit-testable; `run()` can call this with a `--gate-baseline` JSON to
+    return a non-zero exit code for CI when retrieval quality regresses.
+    """
+    violations: list[str] = []
+    for metric in (f"ndcg@{k}", f"recall@{k}", f"prop_recall@{k}"):
+        base = float(baseline.get(metric, 0.0))
+        cur = float(current.get(metric, 0.0))
+        if base > 0.0 and cur < base * (1.0 - max_drop_pct / 100.0):
+            violations.append(
+                f"{metric} regressed: {cur:.3f} < {base:.3f} "
+                f"(baseline − {max_drop_pct:.0f}% floor)"
+            )
+    return violations
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate KB retrieval quality.")
     parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
     parser.add_argument("--profiles", default="hybrid,dense_only")
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--tenant", default=None)
+    parser.add_argument(
+        "--gate-baseline",
+        type=Path,
+        default=None,
+        help="baseline report JSON; exit non-zero if hybrid nDCG/recall regresses",
+    )
+    parser.add_argument("--gate-max-drop-pct", type=float, default=5.0)
     return parser.parse_args()
 
 
@@ -173,6 +231,13 @@ async def run() -> int:
     }
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    # Human-readable quality summary (profile × metric table incl. nDCG@k).
+    quality_dir = REPORTS_DIR / "retrieval"
+    quality_dir.mkdir(parents=True, exist_ok=True)
+    quality_md = quality_dir / "quality.md"
+    quality_md.write_text(render_quality_markdown(results, k=args.k), encoding="utf-8")
+    print(f"[retrieval-eval] quality summary → {quality_md}")
+
     manifest_path = out.with_suffix(".manifest.json")
     meta = build_run_meta(
         argv=sys.argv[1:],
@@ -195,6 +260,31 @@ async def run() -> int:
 
     print(f"[retrieval-eval] report → {out}")
     print(f"[retrieval-eval] run manifest → {manifest_path}")
+
+    # Optional retrieval regression gate (CI): compare the primary profile's
+    # aggregate against a baseline report; non-zero exit on quality regression.
+    if args.gate_baseline is not None:
+        primary = profiles[0]
+
+        def _agg_for(report_results: list[dict[str, Any]]) -> dict[str, float]:
+            for entry in report_results:
+                if entry.get("profile") == primary:
+                    return dict(entry.get("aggregate", {}))
+            return {}
+
+        baseline_report = json.loads(args.gate_baseline.read_text(encoding="utf-8"))
+        violations = check_retrieval_regression(
+            _agg_for(results),
+            _agg_for(baseline_report.get("results", [])),
+            k=args.k,
+            max_drop_pct=args.gate_max_drop_pct,
+        )
+        if violations:
+            print(f"[retrieval-eval] REGRESSION GATE FAILED ({primary}):")
+            for violation in violations:
+                print(f"  - {violation}")
+            return 1
+        print(f"[retrieval-eval] regression gate passed ({primary}).")
     return 0
 
 

@@ -1,6 +1,6 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）+ M11（可观测闭环 & 成本治理）+ M12（Human-in-the-Loop 接力）已实施**；**M13–M15 规划中**。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M13 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存）；**M14–M15 规划中**。
 
 > **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
 > `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
@@ -42,8 +42,8 @@ flowchart LR
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
   class M1,M2,M3,M4,M6 base;
-  class M5,M7,M8,M9,M10,M11,M12 star;
-  class M13,M14,M15 plan;
+  class M5,M7,M8,M9,M10,M11,M12,M13 star;
+  class M14,M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -62,7 +62,7 @@ flowchart LR
 | **M10** | 生产级护栏 & 真沙箱 | ⭐ | fail-closed 默认 + 真实 rlimit 沙箱 + 逃逸测试量化 | ✅ |
 | **M11** | 可观测闭环 & 成本治理 | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + 成本预算熔断 + 成本回归门 | ✅ |
 | **M12** | Human-in-the-Loop 接力 | ⭐ | Executor 审批闸（destructive）+ approve/deny/edit API + `awaiting_approval` SSE + 坐席接管 | ✅ |
-| **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 语义缓存降本降延迟 | 📋 |
+| **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 检索回归门 + 语义缓存（tenant 隔离 + TTL）降本降延迟 | ✅ |
 | **M14** | Eval→数据飞轮 | ⭐ | 生产 trace 自动回灌 eval 集 + 回归门在线自改进 | 📋 |
 | **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错 + CI type gate + compose/K8s 一键起 | 📋 |
 
@@ -301,16 +301,18 @@ flowchart LR
 
 详细技术方案见 [`docs/milestone-12-plan.md`](milestone-12-plan.md)。
 
-## Milestone 13 · RAG 质量度量 & 语义缓存（3 days）⭐ — 📋 Planned
+## Milestone 13 · RAG 质量度量 & 语义缓存（3 days）⭐ — ✅ Done
 
 > **目标**：把 M6 的"检索能跑"升级为"检索质量被量化 + 成本被优化"。
 
 - **已落地地基**：hybrid 检索 dense+lexical **并发**（`asyncio.gather`）；`kb_retrieval_golden.jsonl` 金标已存在。
-- [ ] 检索金标扩充 + **nDCG@k / Recall@k / MRR** 度量脚本，对比 `dense_only` vs `hybrid` vs `+rerank` 三档
-- [ ] **语义缓存**：query embedding 近邻命中即复用答案（pgvector 阈值），量化命中率 / 延迟 / 成本降幅
-- [ ] chunking / embedding backend 消融（chunk size、overlap、ollama vs openai embed）对 nDCG 的影响表
-- [ ] 检索回归门：金标指标下降超阈值即 CI 失败
-- [ ] KB 新鲜度：文档更新→重嵌入的增量 pipeline 草案
+- [x] **nDCG@k**（log2 折扣，二值 & 分级）加入 `retrieval/metrics.py` + `eval_retrieval.py`；产出 `reports/retrieval/quality.md`（profile×metric 表）
+- [x] **语义缓存**（`retrieval/semantic_cache.py`）：cosine-NN 命中即复用检索结果，**tenant 隔离** + TTL + LRU；接入 `HybridRetriever`（命中跳过 DB 往返），`SEMANTIC_CACHE_ENABLED=off` 默认
+- [x] 命中/未命中指标 `resolveai_cache_hits_total` / `resolveai_cache_misses_total`
+- [x] 检索回归门：`check_retrieval_regression` nDCG/recall 跌超阈值即 `eval_retrieval.py` 非零退出
+- [x] LM-free 单测锁定度量/缓存/回归门（`test_semantic_cache.py` + `test_retrieval_metrics.py`）；真实质量数字需 seed DB + embedding
+
+> 进一步生产化（不在本次）：pgvector 持久共享缓存、答案级缓存（补输出侧 re-scan）、chunk/embedding 消融表。
 
 详细技术方案见 [`docs/milestone-13-plan.md`](milestone-13-plan.md)。
 

@@ -1,10 +1,10 @@
 # Milestone 13 — RAG 质量度量 & 语义缓存
 
-**Status:** 📋 规划中。**地基已落地**：`retrieval/hybrid.py` 的 dense（embed + pgvector）与 lexical（`ts_rank_cd`）现在**并发**执行（`asyncio.gather`），降端到端延迟；检索金标 `apps/api/tests/fixtures/kb_retrieval_golden.jsonl` 已存在。
+**Status:** ✅ **已实现**（nDCG@k 度量 + 三档 profile 质量表 + 检索回归门 + 语义缓存组件并接入检索路径）。`SEMANTIC_CACHE_ENABLED=off` 默认，检索路径与 M13 前**逐字节一致**。
 
-**Goal:** 把 M6 的「检索能跑」升级为「检索质量被量化 + 成本被优化」：产出 **nDCG@k / Recall@k / MRR** 金标度量，并加**语义缓存**降本降延迟；对 chunking / embedding backend 做消融。
+**Goal:** 把 M6 的「检索能跑」升级为「检索质量被量化 + 成本被优化」：产出 **nDCG@k / Recall@k / MRR** 金标度量，并加**语义缓存**降本降延迟。
 
-**Design principle:** 调库优先 —— 度量用现成实现（`ranx` / 手写标准公式）；语义缓存复用 pgvector 近邻，不引额外向量库。
+**Design principle（诚实的取舍）：** 度量用手写标准 IR 公式（纯函数、可单测，不引 `ranx`）。语义缓存当前是**进程内 cosine-NN**（小、无依赖、确定性可测），接口存储无关——**pgvector 持久化 / 跨副本共享**（GPTCache 同思路）列为生产化 swap（见 §6），当前不引第三方向量库。nDCG/Recall 的**真实数字需 seed DB + embedding**（本地算力受限未跑），逻辑与回归门均以 LM-free 单测锁定。
 
 ```mermaid
 flowchart LR
@@ -38,19 +38,19 @@ flowchart LR
 2. 无**语义缓存**：语义等价的高频问题每次重算 embedding + 检索 + 生成。
 3. chunking / embedding backend 未消融。
 
-## 3. 技术方案
+## 3. 技术方案（已实现）
 
 ### 3.1 检索质量度量
-- 扩充金标：每条 query 标 `relevant_doc_ids`（分级相关度可选）。
-- `scripts/eval_retrieval.py`：对 `dense_only` / `hybrid` / `hybrid+rerank` 三档跑 nDCG@{5,10}、Recall@{5,10}、MRR，输出 `reports/retrieval/quality.md`。
+- `retrieval/metrics.py`：新增 `dcg_at_k` / `ndcg_at_k`（log2 折扣，支持二值 & 分级相关度）；`recall@k` / `prop_recall@k` / `mrr@k` 复用 M6。
+- `scripts/eval_retrieval.py`：每条 golden 追加 `ndcg@k`；产出 `reports/retrieval/quality.md`（profile × metric 表，纯函数 `render_quality_markdown` 单测）。真实数字需 seed DB + embedding。
 
 ### 3.2 语义缓存
-- `retrieval/semantic_cache.py`：query embedding 与缓存条目做 pgvector 近邻，相似度超阈值即复用上次答案（带 TTL + tenant 隔离）。
-- 命中/未命中埋点（接 M11 metrics）；量化命中率、延迟降幅、成本降幅。
-- 安全：缓存 key 带 tenant_id（对齐 RLS），护栏对缓存命中的输出仍过一遍输出侧 re-scan。
+- `retrieval/semantic_cache.py`：`SemanticCache`（进程内、tenant 分桶、cosine-NN、`threshold`/`ttl_s`/`max_entries`(LRU) 可配，注入 `clock` 便于确定性测 TTL）。
+- 接入 `HybridRetriever`：`SEMANTIC_CACHE_ENABLED=on` 时**先 embed 一次**做缓存查；命中→跳过 dense/lexical/rerank 直接返回（`RetrievalTrace.cache_hit=True`）；未命中→复用该 embedding 跑流水线后写缓存。命中/未命中打点 `resolveai_cache_hits_total` / `resolveai_cache_misses_total`。
+- 安全：桶按 `tenant_id` 严格隔离（对齐 M9 RLS，杜绝跨租户串答案）；命中返回的是**检索结果**，仍走后续答案生成 + Layer-3 输出侧 re-scan，安全边界不变。
 
-### 3.3 消融
-- chunk size / overlap / embedding backend（ollama vs openai）对 nDCG 的影响表。
+### 3.3 检索回归门
+- `check_retrieval_regression`（纯函数）：hybrid 的 `ndcg@k`/`recall@k`/`prop_recall@k` 较 baseline 跌超 `--gate-max-drop-pct`（默认 5%）→ `eval_retrieval.py` 非零退出，供 CI gate。
 
 ## 4. 生产化 & 行业对齐（review）
 
@@ -63,7 +63,14 @@ flowchart LR
 
 ## 5. 验收
 
-- [ ] 三档检索的 nDCG/Recall/MRR 表产出，结论能 back up "hybrid + rerank 的收益"
-- [ ] 语义缓存命中率 / 延迟 / 成本降幅有数字，且 tenant 隔离正确
-- [ ] 检索回归门：金标指标下降超阈值即 CI 失败
-- [ ] 新增测试全绿，`ruff`/`mypy` 不新增错误
+- [x] nDCG@k 度量 + profile×metric 质量表渲染（`ndcg_at_k`/`dcg_at_k` + `render_quality_markdown`，单测锁定；真实数字需 seed DB + embedding 跑 `eval_retrieval.py`）
+- [x] 语义缓存：cosine-NN 命中/未命中、TTL 过期、LRU 淘汰、**tenant 隔离**、命中跳过 DB 往返（`test_semantic_cache.py`，含 `HybridRetriever` 同义词命中集成测试）
+- [x] 检索回归门：nDCG/recall 跌超阈值即非零退出（`check_retrieval_regression` + `test_retrieval_regression_gate`）
+- [x] 命中/未命中指标 `resolveai_cache_hits_total` / `resolveai_cache_misses_total`
+- [x] 新增测试全绿（185 passed LM-free），`ruff` clean，`mypy src` 不新增错误（38→38）
+
+## 6. 进一步生产化（明确不在本次范围）
+
+- **持久 / 共享缓存**：`SemanticCache` 换 pgvector 后端（跨副本共享、重启可续；GPTCache 同思路），接口已存储无关。
+- **答案级缓存**：当前缓存**检索结果**（省 DB + rerank）；缓存最终答案（省生成成本）需在命中路径显式补跑输出侧护栏 re-scan，作为后续增量。
+- **消融**：chunk size/overlap、embedding backend（ollama vs openai）对 nDCG 的单变量对照表（需算力）。
