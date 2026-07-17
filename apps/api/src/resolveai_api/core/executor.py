@@ -89,7 +89,7 @@ class Executor:
             attributes={"tool": full, "capability": capability, "audit": audit},
         ) as tool_span:
             try:
-                async with self.sandbox.scope(tool=full) as scope:
+                async with self.sandbox.scope(tool=full, capability=capability) as scope:
                     output = await tool.ainvoke(args)
             except Exception as exc:
                 # Record the failed call for ablation tool-error accounting, then

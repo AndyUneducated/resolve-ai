@@ -18,7 +18,7 @@ class McpServerSpec:
 
 
 def default_servers() -> list[McpServerSpec]:
-    """Return only servers with a non-empty cmd (stub servers are skipped in M2)."""
+    """Return only servers with a non-empty cmd (unset servers are skipped)."""
     s = get_settings()
     transport = s.mcp_transport
     candidates = [

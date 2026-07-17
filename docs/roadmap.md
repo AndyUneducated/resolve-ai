@@ -1,6 +1,12 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Milestone 1–9 全部完成**（详见下方各里程碑勾选项）。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）已实施**；**M11–M15 规划中**。
+
+> **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
+> `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
+> `/chat` 结束事件带**每请求 token/成本**（`capture_run`）、护栏 **fail-closed 开关**（`GUARDRAIL_FAIL_CLOSED`）、
+> `/readyz` 真探测 DB/MCP、检索 dense+lexical 并发、前端 tool-trace 展示 + a11y、CI 增加前端 `build`（含 tsc）、
+> 删除死代码（`core/router.py` / `mcp/client.py`）。这些是 Phase 2 各里程碑的地基；完整版见下方 M10–M15。
 
 **图例：**
 
@@ -25,10 +31,19 @@ flowchart LR
   M7 --> M8["M8 · Chaos Demo & 视频 ⭐"]
   M4 --> M9["M9 · 多租户硬隔离 RLS ⭐"]
   M6 --> M9
+  %% ---- Phase 2（规划中）----
+  M4 --> M10["M10 · 生产级护栏 & 真沙箱 ⭐"]
+  M8 --> M11["M11 · 可观测闭环 & 成本治理 ⭐"]
+  M3 --> M12["M12 · Human-in-the-Loop 接力 ⭐"]
+  M6 --> M13["M13 · RAG 质量度量 & 语义缓存 ⭐"]
+  M5 --> M14["M14 · Eval→数据飞轮（在线自改进）⭐"]
+  M9 --> M15["M15 · 类型洁净 & 一键全栈部署 🧱"]
   classDef base fill:#e7f0ff,stroke:#4169E1,color:#10357a;
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
+  classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
   class M1,M2,M3,M4,M6 base;
-  class M5,M7,M8,M9 star;
+  class M5,M7,M8,M9,M10 star;
+  class M11,M12,M13,M14,M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -44,6 +59,14 @@ flowchart LR
 | M7 | Architecture Ablation | ⭐ | 120-ticket benchmark × 4 配置，量化 trade-off | ✅ |
 | M8 | Chaos Demo & 视频 | ⭐ | 5K 并发压测 + online regression gate + demo 视频 | ✅ |
 | M9 | 多租户硬隔离（RLS） | ⭐ | Postgres Row-Level Security 兜底应用层 bug | ✅ |
+| **M10** | 生产级护栏 & 真沙箱 | ⭐ | fail-closed 默认 + 真实 rlimit 沙箱 + 逃逸测试量化 | ✅ |
+| **M11** | 可观测闭环 & 成本治理 | ⭐ | OTel→Collector→Grafana + 每请求成本预算 + 熔断 | 📋 |
+| **M12** | Human-in-the-Loop 接力 | ⭐ | LangGraph `interrupt` 审批 + 断点续聊 + 坐席交接 | 📋 |
+| **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 语义缓存降本降延迟 | 📋 |
+| **M14** | Eval→数据飞轮 | ⭐ | 生产 trace 自动回灌 eval 集 + 回归门在线自改进 | 📋 |
+| **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错 + CI type gate + compose/K8s 一键起 | 📋 |
+
+> Phase 2 详细技术方案：[M10](milestone-10-plan.md) · [M11](milestone-11-plan.md) · [M12](milestone-12-plan.md) · [M13](milestone-13-plan.md) · [M14](milestone-14-plan.md) · [M15](milestone-15-plan.md)。
 
 ## Milestone 1 · Hello-World 流通（1 day）🧱 — ✅ Done
 
@@ -228,3 +251,91 @@ flowchart LR
 - [x] RLS 负向测试：跨租户读 / 写 / 删在 DB 层抛错（与现有 app 层 `IsolatedCheckpointer` 互为冗余）
 
 详细技术方案见 [`docs/milestone-9-plan.md`](milestone-9-plan.md)。
+
+---
+
+# Phase 2 · 从「demo-ready」到「production-grade」（M10–M15）📋 规划中
+
+> **定位**：Phase 1 证明了"能力"（多 Agent、护栏、检索、eval、隔离）。Phase 2 证明"运营" —— 生产环境要求的
+> fail-safe 默认、可观测闭环、人机接力、质量度量、自改进飞轮与一键部署。每个里程碑都在本次**加固 pass 落地的地基**之上延展，
+> 面试叙事从"我实现了 X"升级为"我把 X 运营到了生产 SLO"。
+>
+> 依赖顺序：M10/M11 可并行起步（都依赖已落地的 fail-closed 开关与 `capture_run` 成本埋点）；M12 依赖 M10 的审批中断；
+> M13 依赖 M6 检索；M14 依赖 M5 eval + M11 trace；M15 收尾（类型 + 部署），可随时穿插。
+
+## Milestone 10 · 生产级护栏 & 真沙箱（3-4 days）⭐ — ✅ Done
+
+> **目标**：把护栏从"能演示拦截"升级为"生产可依赖" —— profile 感知的 fail-closed 默认、**真实 OS 级沙箱**（POSIX rlimit + 墙钟超时）+ gVisor 容器命令契约、并用**逃逸测试**量化沙箱有效性（拦截率 / 逃逸率）。
+
+- [x] fail-closed 变为**生产 profile 默认**（`ENV_PROFILE` + `GUARDRAIL_FAIL_CLOSED=auto` + `resolve_fail_closed`），并用 `BlockKind` 区分「降级拦截 degraded」与「真命中拦截 true_positive」（`blocked` 事件带 `layer`+`kind`，span 记 `blocked_kind`）
+- [x] **真实沙箱**（`guardrails/sandbox.py`）：subprocess 后端 `setrlimit`（CPU/内存/进程/文件大小）+ 墙钟超时**实测强制**；container 后端构造 gVisor `runsc` 全维隔离命令（`--network`/`--read-only`/`--memory`/`--pids-limit`/`--ulimit`/`--cap-drop=ALL`）+ 运行时探测 + 后端选择。工具真正入容器执行列为遗留（当前进程内 async 调用）
+- [x] **沙箱逃逸测试集**（读 `/etc/passwd`、外连、CPU DoS、写盘、fork-bomb-lite、env 泄漏）→ `scripts/eval_sandbox.py` 产出 `reports/sandbox/escape_matrix_*.md`：subprocess 层对资源型攻击 4/5 拦截，**filesystem 读逃逸**（量化 gVisor 必要性）
+- [x] 护栏各层 latency 进 `done` 事件（`guardrail_latency_ms.{input,output}`）+ `ticket.run` span
+- [x] 测试：`test_sandbox.py`（真实子进程 containment + 容器契约）+ `test_hardening.py`（profile / block_kind / production 默认硬拦截）—— `146 passed`
+
+详细技术方案见 [`docs/milestone-10-plan.md`](milestone-10-plan.md)。
+
+## Milestone 11 · 可观测闭环 & 成本治理（3 days）⭐ — 📋 Planned
+
+> **目标**：把 M8 的 no-op OTel span 和本次落地的每请求成本，接成"trace→collector→dashboard"的闭环，并加上成本预算 / 熔断。
+
+- **已落地地基**：`core/usage.capture_run` 每请求 token/成本聚合 + `/chat` `done` 事件下发 + `eval/pricing` 成本模型；OTel span helper（M8）。
+- [ ] OTel exporter 接真实 **Collector → Tempo/Jaeger + Prometheus + Grafana**（docker-compose 一键起），span 变有效导出
+- [ ] Grafana dashboard：auto-resolve rate、每 tier token/成本、护栏拦截分层、P50/P95 latency、tool 错误率
+- [ ] **每请求成本预算 + 熔断**：超预算的 ticket 主动降级（停用高价 tier / 截断 plan）并打 flag
+- [ ] `/metrics` Prometheus 端点 + `done` 事件成本回填到 trace 属性（本次已埋 `total_tokens`/`cost_usd`）
+- [ ] 成本回归门：CI 对比基线，单 ticket 平均成本上涨超阈值即失败（复用 `regression_gate.py`）
+
+详细技术方案见 [`docs/milestone-11-plan.md`](milestone-11-plan.md)。
+
+## Milestone 12 · Human-in-the-Loop 接力（3 days）⭐ — 📋 Planned
+
+> **目标**：把"escalation 真路由"升级为"真正的人机协作" —— 高风险动作前**中断等待人工审批**，坐席可续聊、可接管。
+
+- **已落地地基**：billing/technical → escalation **真图边**（`escalate` flag + `_route_after_vertical`），取代文字后缀。
+- [ ] LangGraph `interrupt()` 在 destructive 动作（退款 / 删除 / 升级）前挂起，等待人工 approve/deny
+- [ ] 审批 API + 前端审批卡片：待办队列、approve/deny/edit，决策写回 checkpoint 续跑
+- [ ] 坐席接管：把 thread 从 Agent 交给人工（沿用 `AsyncPostgresSaver` 断点续聊 + 跨班次恢复）
+- [ ] 审批审计：谁在何时批了什么（对齐 M3 destructive `audit=True`）
+- [ ] e2e 测试：中断 → 审批 → 续跑，deny 路径回退安全响应
+
+详细技术方案见 [`docs/milestone-12-plan.md`](milestone-12-plan.md)。
+
+## Milestone 13 · RAG 质量度量 & 语义缓存（3 days）⭐ — 📋 Planned
+
+> **目标**：把 M6 的"检索能跑"升级为"检索质量被量化 + 成本被优化"。
+
+- **已落地地基**：hybrid 检索 dense+lexical **并发**（`asyncio.gather`）；`kb_retrieval_golden.jsonl` 金标已存在。
+- [ ] 检索金标扩充 + **nDCG@k / Recall@k / MRR** 度量脚本，对比 `dense_only` vs `hybrid` vs `+rerank` 三档
+- [ ] **语义缓存**：query embedding 近邻命中即复用答案（pgvector 阈值），量化命中率 / 延迟 / 成本降幅
+- [ ] chunking / embedding backend 消融（chunk size、overlap、ollama vs openai embed）对 nDCG 的影响表
+- [ ] 检索回归门：金标指标下降超阈值即 CI 失败
+- [ ] KB 新鲜度：文档更新→重嵌入的增量 pipeline 草案
+
+详细技术方案见 [`docs/milestone-13-plan.md`](milestone-13-plan.md)。
+
+## Milestone 14 · Eval→数据飞轮（在线自改进）（3-4 days）⭐ — 📋 Planned
+
+> **目标**：把 M5 的静态 eval 集升级为"生产 trace 自动回灌 eval、回归门在线自改进"的闭环 —— senior 级的"系统会自己变好"叙事。
+
+- **已落地地基**：M5 对抗 eval + judge/scoring；M8 `regression_gate.py` + OTel span；本次每请求 trace 带成本。
+- [ ] 生产 trace **采样 + 脱敏**（复用 Presidio）自动沉淀为候选 eval case
+- [ ] 人工/judge 标注回流，扩充 `red_team.jsonl` / `benchmark_tickets.jsonl`，形成版本化数据集
+- [ ] 在线回归门：新版本对**当前 + 新采集**的 case 跑分，回归即拦截发布
+- [ ] 失败案例聚类（按 intent / 护栏层 / tool），产出"最该修的 top-N"报表
+- [ ] 数据飞轮指标：随时间的 auto-resolve rate / 护栏漏检率曲线
+
+详细技术方案见 [`docs/milestone-14-plan.md`](milestone-14-plan.md)。
+
+## Milestone 15 · 类型洁净 & 一键全栈部署（2-3 days）🧱 — 📋 Planned
+
+> **目标**：补齐工程收尾 —— 类型零错并进 CI 门禁、一键起全栈（含依赖服务）、部署可复现。
+
+- **已落地地基**：CI 已加前端 `npm run build`（隐式 tsc 门禁）；后端 `ruff` 已在 CI；`mypy` 本地基线 58 错（多在测试）。
+- [ ] `mypy` 收敛到**零错**（source + tests），修复 `Literal[..., END]`、`with_structured_output` 返回类型、测试 `BaseTool` 覆盖模式
+- [ ] CI 增加 **mypy type gate**（阻断新增类型错误）
+- [ ] `docker-compose` 一键起**全栈**：api + web + postgres(+pgvector) + ollama + otel collector + grafana，含 healthcheck 依赖顺序
+- [ ] API 容器 healthcheck 接本次落地的 `/readyz`（真探测 DB/MCP，degraded 返回 503）
+- [ ] 部署文档 + `.env` 生产 profile（fail-closed on、真 endpoint）+ 冒烟脚本
+
+详细技术方案见 [`docs/milestone-15-plan.md`](milestone-15-plan.md)。

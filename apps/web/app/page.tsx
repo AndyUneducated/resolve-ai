@@ -36,12 +36,21 @@ export default function Home() {
       </section>
 
       <section className="rounded-lg border border-border bg-muted/40 p-6">
-        <h2 className="text-lg font-medium">下一步</h2>
-        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-foreground/80">
-          <li>实现 <code>/chat</code> 聊天 UI（SSE 接收 agent_step / tool_call event）</li>
-          <li>实现 <code>/dashboard</code>（leader 视角：ticket 流量 + auto-resolve rate）</li>
-          <li>实现 <code>/admin</code>（IT admin：MCP server 配置 + RBAC）</li>
-        </ol>
+        <h2 className="text-lg font-medium">现状与下一步</h2>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-foreground/80">
+          <li>
+            <span className="text-foreground/50">[已上线]</span> <code>/chat</code>{" "}
+            聊天 UI：SSE 流式 agent_step、每步 tool trace、护栏 flag chip、结束带 token/成本
+          </li>
+          <li>
+            <span className="text-foreground/40">[规划中]</span> <code>/dashboard</code>
+            （leader 视角：ticket 流量 + auto-resolve rate）
+          </li>
+          <li>
+            <span className="text-foreground/40">[规划中]</span> <code>/admin</code>
+            （IT admin：MCP server 配置 + RBAC）
+          </li>
+        </ul>
         <Link
           href="/chat"
           className="mt-4 inline-block rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"

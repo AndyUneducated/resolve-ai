@@ -3,7 +3,13 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-type AgentStep = { agent: string; content: string; flags: string[] };
+type ToolCall = { step?: string; observation?: string; error?: string };
+type AgentStep = {
+  agent: string;
+  content: string;
+  flags: string[];
+  toolCalls: ToolCall[];
+};
 
 /** sse-starlette 使用 CRLF；用 `\n\n` 切事件前需归一化，否则会整包粘在一起、JSON 带 `\r` 解析失败。 */
 function splitSseEvents(raw: string): { events: string[]; rest: string } {
@@ -107,6 +113,9 @@ function ChatPageContent() {
                   flags: Array.isArray(payload.flags)
                     ? (payload.flags as string[])
                     : [],
+                  toolCalls: Array.isArray(payload.tool_calls)
+                    ? (payload.tool_calls as ToolCall[])
+                    : [],
                 },
               ]);
             }
@@ -145,6 +154,7 @@ function ChatPageContent() {
         <input
           className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="描述你的问题…"
+          aria-label="描述你的问题"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
@@ -154,13 +164,18 @@ function ChatPageContent() {
           type="button"
           onClick={send}
           disabled={streaming}
+          aria-busy={streaming}
+          aria-label={streaming ? "处理中" : "发送"}
           className="rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
         >
           {streaming ? "Thinking…" : "发送"}
         </button>
       </div>
 
-      <div className="flex min-h-[12rem] flex-col gap-3 rounded-lg border border-border p-4">
+      <div
+        className="flex min-h-[12rem] flex-col gap-3 rounded-lg border border-border p-4"
+        aria-live="polite"
+        aria-busy={streaming}>
         {streaming && steps.length === 0 && (
           <div className="text-sm text-foreground/70">
             <p className="font-medium text-foreground/90">正在处理…</p>
@@ -180,14 +195,36 @@ function ChatPageContent() {
           </div>
         )}
         {steps.map((s, i) => (
-          <div key={i} className="rounded-md bg-muted/60 p-3">
+          <div key={`${s.agent}-${i}`} className="rounded-md bg-muted/60 p-3">
             <div className="text-xs uppercase tracking-wide text-foreground/50">{s.agent}</div>
             <div className="mt-1 whitespace-pre-wrap text-sm">{s.content}</div>
+            {s.toolCalls?.length > 0 && (
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer text-foreground/50">
+                  Tool trace ({s.toolCalls.length})
+                </summary>
+                <ul className="mt-1 space-y-1">
+                  {s.toolCalls.map((tc, j) => (
+                    <li
+                      key={`${s.agent}-${i}-tc-${j}`}
+                      className="rounded bg-background/60 px-2 py-1 font-mono text-[11px] text-foreground/70"
+                    >
+                      <span className="text-foreground/90">{tc.step ?? "tool"}</span>
+                      {tc.error ? (
+                        <span className="text-red-400"> → error: {tc.error}</span>
+                      ) : tc.observation ? (
+                        <span> → {String(tc.observation).slice(0, 240)}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {s.flags?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
-                {s.flags.map((f) => (
+                {s.flags.map((f, k) => (
                   <span
-                    key={f}
+                    key={`${s.agent}-${i}-flag-${k}`}
                     className="rounded bg-yellow-200/30 px-2 py-0.5 text-[10px] text-yellow-900 dark:text-yellow-200"
                   >
                     {f}

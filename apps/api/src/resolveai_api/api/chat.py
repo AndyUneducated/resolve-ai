@@ -32,7 +32,13 @@ class ChatRequest(BaseModel):
 async def chat(
     req: ChatRequest, supervisor: SupervisorDep, tenant_id: TenantDep
 ) -> EventSourceResponse:
-    """SSE 流：每一步 token / tool_call / handoff / final 都是一个 event。"""
+    """SSE 流：每个 Agent 步骤一个 event。
+
+    事件类型（与 `SupervisorGraph.stream` 对齐）：
+    - `agent_step`：某个 Agent 产出一段回复，data = {agent, content, flags}
+    - `blocked`：被护栏拦截（L1 输入 / L3 输出 / L4 跨租户），data = {reason}
+    - `done`：本轮结束，data = {}
+    """
 
     # 租户身份统一由 get_tenant_id 解析（无鉴权，demo 回退 DEFAULT_TENANT_ID）；
     # 请求体里若显式带了 tenant_id 则以它为准，喂给下游 SET LOCAL app.tenant_id。

@@ -71,8 +71,9 @@ class Settings(BaseSettings):
     # ---------- MCP ----------
     mcp_transport: str = Field(default="stdio", alias="MCP_TRANSPORT")
     mcp_stripe_cmd: str = Field(default="python -m mcp_servers.stripe", alias="MCP_STRIPE_CMD")
-    # The remaining 4 servers ship as TOOLS-only stubs in M2; their stdio impl
-    # lands in M3. Setting any of these to a real cmd auto-enables them.
+    # All 5 servers are real stdio MCP servers (M3). Only Stripe is enabled by
+    # default here to keep a minimal boot; `.env.example` enables all 5. Setting
+    # any of these to a real cmd auto-enables that server (see `registry.py`).
     mcp_zendesk_cmd: str = Field(default="", alias="MCP_ZENDESK_CMD")
     mcp_slack_cmd: str = Field(default="", alias="MCP_SLACK_CMD")
     mcp_salesforce_cmd: str = Field(default="", alias="MCP_SALESFORCE_CMD")
@@ -81,6 +82,21 @@ class Settings(BaseSettings):
     mcp_sandbox_image: str = Field(
         default="resolveai/mcp-servers:dev", alias="MCP_SANDBOX_IMAGE"
     )
+    # ---------- Sandbox policy (M10 · Layer 2 blast-radius containment) ----------
+    # Per tool-call resource / isolation budget. Enforced by the container runtime
+    # (gVisor `runsc` / `runc`) when available, else best-effort by the subprocess
+    # backend (POSIX rlimits + wall timeout). Network / read-only-fs are only
+    # enforceable by the container tier — the subprocess tier reports them as
+    # `degraded`, which is exactly why blast-radius containment needs gVisor.
+    sandbox_cpu_seconds: int = Field(default=5, alias="SANDBOX_CPU_SECONDS")
+    sandbox_memory_mb: int = Field(default=256, alias="SANDBOX_MEMORY_MB")
+    sandbox_wall_timeout_s: float = Field(default=10.0, alias="SANDBOX_WALL_TIMEOUT_S")
+    sandbox_max_processes: int = Field(default=64, alias="SANDBOX_MAX_PROCESSES")
+    sandbox_max_file_mb: int = Field(default=16, alias="SANDBOX_MAX_FILE_MB")
+    sandbox_network: str = Field(default="none", alias="SANDBOX_NETWORK")  # none|allowlist
+    # App profile: "demo" (fail-open, favor availability) | "production"
+    # (fail-closed guardrails + sandbox enforced by default).
+    env_profile: str = Field(default="demo", alias="ENV_PROFILE")
 
     # ---------- Guardrails ----------
     llama_guard_endpoint: str = Field(default="", alias="LLAMA_GUARD_ENDPOINT")
@@ -115,6 +131,11 @@ class Settings(BaseSettings):
     guardrail_l2: str = Field(default="on", alias="GUARDRAIL_L2")
     guardrail_l3: str = Field(default="on", alias="GUARDRAIL_L3")
     guardrail_l4: str = Field(default="on", alias="GUARDRAIL_L4")
+    # Fail-closed: a guard that times out / is unavailable (Llama Guard, Presidio,
+    # policy judge) causes the request to be BLOCKED rather than passed through.
+    #   "on"/"off" = explicit override; "auto" = follow `env_profile`
+    #   (production → closed, demo → open). See `attribution.resolve_fail_closed`.
+    guardrail_fail_closed: str = Field(default="auto", alias="GUARDRAIL_FAIL_CLOSED")
 
     # ---------- Retrieval (M6 · Hybrid Retrieval) ----------
     # 调库优先：embedding 走 langchain-ollama / langchain-openai 现成 Embeddings；

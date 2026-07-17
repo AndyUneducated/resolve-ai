@@ -77,8 +77,11 @@ make red-team    # 对抗 prompt 烟测（baseline profile，期望 0 PII 泄漏
 
 每个 PR 会跑两个 job，都要绿：
 
-- `backend`（uv / ruff / mypy / pytest）
-- `frontend`（Next.js lint + tsc）
+- `backend`（uv / ruff / pytest）
+- `frontend`（Next.js lint + build；`next build` 内含 tsc 类型检查）
+
+> 本地 `make typecheck` 还会额外跑后端 `mypy`。目前 mypy 尚未全绿（见 roadmap 的类型加固里程碑），
+> 因此暂未纳入 CI 门禁；提交前建议本地跑一遍。
 
 如果改动会影响 red-team 通过率，请在 PR 描述里贴前后对比。
 

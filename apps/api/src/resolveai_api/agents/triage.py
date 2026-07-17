@@ -9,16 +9,23 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from resolveai_api.agents.base import AgentConfig, BaseAgent
-from resolveai_api.agents.state import GraphState, TicketSummary
-from resolveai_api.core.llm import make_structured_llm
+from resolveai_api.agents.state import AgentName, GraphState, TicketSummary
+from resolveai_api.core.llm import LLMTier, make_structured_llm
 
 logger = logging.getLogger(__name__)
+
+OTHER_INTENT_FALLBACK = (
+    "I want to make sure I route this to the right place. Could you tell me whether "
+    "this is about billing (charges, refunds, invoices), a technical issue, or "
+    "something you'd like a human agent to handle? In the meantime I can connect you "
+    "with a support specialist if you prefer."
+)
 
 SYSTEM_PROMPT = """\
 You are the Triage Agent of an enterprise customer support system.
@@ -70,14 +77,14 @@ def _last_user_text(state: GraphState) -> str:
 
 
 class TriageAgent(BaseAgent):
-    def __init__(self, *, tier: str = "triage", **kwargs: Any) -> None:
+    def __init__(self, *, tier: LLMTier = "triage", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # Cost-routing knob: variant D uses the cheap `triage` tier; the
         # cost-routing ablation runs the same graph with tier="vertical".
-        self._tier = tier
+        self._tier: LLMTier = tier
 
     @classmethod
-    def default(cls, *, tier: str = "triage", **kwargs: Any) -> TriageAgent:
+    def default(cls, *, tier: LLMTier = "triage", **kwargs: Any) -> TriageAgent:
         from resolveai_api.config import get_settings
 
         settings = get_settings()
@@ -121,11 +128,18 @@ class TriageAgent(BaseAgent):
             if tagged not in flags:
                 flags.append(tagged)
 
-        return {
-            **state,
+        routed = output.intent in ("billing", "technical", "escalation")
+        current_agent: AgentName = cast(AgentName, output.intent) if routed else "triage"
+        update: GraphState = {
             "ticket_summary": summary,
-            "current_agent": output.intent
-            if output.intent in ("billing", "technical", "escalation")
-            else "triage",
+            "current_agent": current_agent,
             "guardrail_flags": flags,
         }
+        # Triage never returns `messages`: it only classifies. Echoing the input
+        # back (via `**state`) would surface the user's own text as a fake "triage"
+        # reply in the SSE stream. For the `other` intent there is no vertical
+        # agent to route to, so emit a graceful clarification — otherwise the graph
+        # would end with zero assistant messages (an empty response to the user).
+        if not routed:
+            update["messages"] = [AIMessage(content=OTHER_INTENT_FALLBACK)]
+        return update

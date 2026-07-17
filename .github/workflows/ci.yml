@@ -30,7 +30,7 @@ jobs:
         run: uv run python -m pytest -q
 
   frontend:
-    name: Next.js (lint)
+    name: Next.js (lint + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,3 +49,7 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+
+      # `next build` also type-checks (tsc), so this gates TypeScript too.
+      - name: Build
+        run: npm run build

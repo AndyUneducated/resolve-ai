@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -154,21 +155,27 @@ class HybridRetriever:
         rrf_k: int,
         trace: RetrievalTrace,
     ) -> list[RetrievedDoc]:
-        # ---- dense path (always on) ----
-        embedding = await self._get_embedder().aembed_query(query)
-        dense = await self._store.dense_search(
-            query_embedding=embedding, tenant_id=tenant_id, k=self._candidate_k
-        )
-        trace.dense_ids = [d.id for d in dense]
+        async def _dense() -> list[RetrievedDoc]:
+            embedding = await self._get_embedder().aembed_query(query)
+            return await self._store.dense_search(
+                query_embedding=embedding, tenant_id=tenant_id, k=self._candidate_k
+            )
 
         if self._profile == "dense_only":
+            dense = await _dense()
+            trace.dense_ids = [d.id for d in dense]
             candidates = dense
             trace.fused_ids = trace.dense_ids
         else:
-            # ---- lexical path ----
-            lexical = await self._store.lexical_search(
-                query=query, tenant_id=tenant_id, k=self._candidate_k
+            # Dense (embed + pgvector) and lexical (ts_rank_cd) are independent DB
+            # round-trips; run them concurrently to cut end-to-end latency.
+            dense, lexical = await asyncio.gather(
+                _dense(),
+                self._store.lexical_search(
+                    query=query, tenant_id=tenant_id, k=self._candidate_k
+                ),
             )
+            trace.dense_ids = [d.id for d in dense]
             trace.lexical_ids = [d.id for d in lexical]
             candidates = self._fuse(dense, lexical, rrf_k=rrf_k)
             trace.fused_ids = [d.id for d in candidates]

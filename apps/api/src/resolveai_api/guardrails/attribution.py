@@ -27,6 +27,19 @@ class GuardrailOutcome(StrEnum):
     CLEAN = "clean"
 
 
+class BlockKind(StrEnum):
+    """Why a request was blocked — for SLO reporting (M10).
+
+    Distinguishes a *real* catch from an *availability* failure so dashboards can
+    separate "we stopped something harmful" from "a guard was down and we chose
+    safety over availability".
+    """
+
+    TRUE_POSITIVE = "true_positive"  # a hard-blocking flag actually fired
+    DEGRADED = "degraded"  # a guard timed out / was unavailable under fail-closed
+    NONE = "none"
+
+
 def flag_enabled(value: object) -> bool:
     return str(value).strip().lower() in {"1", "true", "on", "yes"}
 
@@ -54,6 +67,52 @@ BLOCKING_FLAGS: tuple[str, ...] = (
     "hallucinated:",
     "cross_tenant_blocked",
 )
+
+
+# Availability-failure markers (guard timed out / dependency unavailable). These
+# are NON-blocking by default (fail-open: favor availability). When
+# GUARDRAIL_FAIL_CLOSED=on, the Supervisor treats their presence as a block
+# (fail-closed: favor safety). Kept separate from BLOCKING_FLAGS so the eval /
+# ablation scoring (which measures real catches) is unaffected.
+DEGRADED_FLAGS: tuple[str, ...] = (
+    "llama_guard_timeout",
+    "llama_guard_unavailable",
+    "presidio_unavailable",
+    "policy_judge_timeout",
+    "policy_judge_unavailable",
+)
+
+
+def has_degraded_flag(flags: Iterable[str]) -> bool:
+    flagset = set(flags)
+    return any(marker in flagset for marker in DEGRADED_FLAGS)
+
+
+_FALSY = {"0", "false", "off", "no"}
+
+
+def resolve_fail_closed(fail_closed: object, env_profile: object = "demo") -> bool:
+    """Resolve the effective fail-closed decision.
+
+    `"on"`/`"off"` are explicit overrides; anything else (`"auto"`/unset) follows
+    the profile — `production` → fail-closed, `demo` → fail-open.
+    """
+    value = str(fail_closed).strip().lower()
+    if flag_enabled(value):
+        return True
+    if value in _FALSY:
+        return False
+    return str(env_profile).strip().lower() == "production"
+
+
+def block_kind(flags: Iterable[str], *, fail_closed: bool) -> BlockKind:
+    """Classify why (if at all) these flags block the request."""
+    normalized = list(flags)
+    if blocked_by_flags(normalized):
+        return BlockKind.TRUE_POSITIVE
+    if fail_closed and has_degraded_flag(normalized):
+        return BlockKind.DEGRADED
+    return BlockKind.NONE
 
 
 def is_blocking_flag(flag: str) -> bool:

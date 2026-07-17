@@ -49,3 +49,6 @@ class GraphState(TypedDict, total=False):
 
     # Guardrails 标记
     guardrail_flags: list[str]
+
+    # 业务 Agent 请求转人工 → Supervisor 路由到 escalation 节点（真接力，非文字建议）
+    escalate: bool

@@ -93,10 +93,9 @@ class BillingAgent(BaseAgent):
 
         response = result.get("response")
         past_steps = result.get("past_steps") or []
+        escalate = bool(response.escalate) if response is not None else False
         if response is not None:
             assistant_text = response.final_answer
-            if response.escalate:
-                assistant_text += "\n\n[Billing → escalation suggested]"
         elif past_steps:
             assistant_text = "I've worked on your billing issue:\n" + "\n".join(
                 f"- {s}: {o}" for s, o in past_steps[-3:]
@@ -111,8 +110,11 @@ class BillingAgent(BaseAgent):
         for step, observation in past_steps:
             tool_calls.append({"step": step, "observation": observation})
 
+        # `escalate=True` makes the Supervisor route to the escalation node (a real
+        # graph handoff), instead of the old advisory text suffix that ended the run.
         return {
             **state,
             "messages": [AIMessage(content=assistant_text)],
             "tool_calls": tool_calls,
+            "escalate": escalate,
         }

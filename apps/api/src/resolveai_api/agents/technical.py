@@ -146,9 +146,12 @@ class TechnicalAgent(BaseAgent):
         retriever = self._get_retriever()
         if retriever is None or not query.strip():
             return [], {}, []
+        from resolveai_api.config import get_settings
+
+        top_k = get_settings().retrieval_top_k
         try:
             docs, trace = await retriever.search_with_trace(
-                query=query, tenant_id=tenant_id, k=5
+                query=query, tenant_id=tenant_id, k=top_k
             )
         except Exception as exc:
             logger.exception("technical_kb_search_failed")
@@ -231,7 +234,7 @@ class TechnicalAgent(BaseAgent):
                 context_lines.append(f"Full conversation transcript:\n{transcript}")
 
         # ---- 3. Grounded answer generation + citation verification ----
-        message, answer_flags = await self._generate_answer(
+        message, answer_flags, escalate = await self._generate_answer(
             query=query, kb_docs=kb_docs, history_lines=context_lines
         )
         guardrail_flags.extend(answer_flags)
@@ -241,12 +244,17 @@ class TechnicalAgent(BaseAgent):
             "messages": [AIMessage(content=message)],
             "tool_calls": tool_calls,
             "guardrail_flags": sorted(set(guardrail_flags)),
+            "escalate": escalate,
         }
 
     async def _generate_answer(
         self, *, query: str, kb_docs: list[RetrievedDoc], history_lines: list[str]
-    ) -> tuple[str, list[str]]:
-        """Produce a grounded reply; verify citations ⊆ retrieved doc ids."""
+    ) -> tuple[str, list[str], bool]:
+        """Produce a grounded reply; verify citations ⊆ retrieved doc ids.
+
+        Returns `(message, flags, escalate)`; `escalate=True` asks the Supervisor
+        to route to the escalation node (real handoff) after this reply.
+        """
         if not kb_docs:
             # No KB context (DB down / empty corpus): degrade to a safe handoff note.
             note = (
@@ -255,7 +263,7 @@ class TechnicalAgent(BaseAgent):
             )
             if history_lines:
                 note += "\n" + "\n".join(f"- {line}" for line in history_lines)
-            return note, ["grounding:no_kb_context"]
+            return note, ["grounding:no_kb_context"], True
 
         kb_context = _format_kb_context(kb_docs)
         retrieved_ids = {d.id for d in kb_docs}
@@ -283,6 +291,7 @@ class TechnicalAgent(BaseAgent):
                 f"Based on our knowledge base ({cited}), here are the relevant "
                 "troubleshooting steps. Please follow the cited articles.",
                 ["grounding:llm_unavailable"],
+                False,
             )
 
         # Verify citations: drop any hallucinated doc id.
@@ -298,6 +307,4 @@ class TechnicalAgent(BaseAgent):
         citation_str = ", ".join(f"[doc {doc_id}]" for doc_id in verified)
         body = answer.answer.strip()
         text = f"{body}\n\nSources: {citation_str}"
-        if answer.escalate:
-            text += "\n\n[Technical → escalation suggested]"
-        return text, flags
+        return text, flags, bool(answer.escalate)
