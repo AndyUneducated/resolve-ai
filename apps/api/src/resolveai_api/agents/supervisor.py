@@ -32,6 +32,7 @@ from resolveai_api.agents.technical import TOOL_WHITELIST as TECHNICAL_WHITELIST
 from resolveai_api.agents.technical import TechnicalAgent
 from resolveai_api.agents.triage import TriageAgent
 from resolveai_api.config import get_settings
+from resolveai_api.core.budget import is_over_budget
 from resolveai_api.core.checkpointer import CrossTenantAccessBlockedError
 from resolveai_api.core.executor import Executor
 from resolveai_api.core.usage import RunTrace, capture_run
@@ -45,6 +46,7 @@ from resolveai_api.guardrails.input_filter import InputGuardrail
 from resolveai_api.guardrails.memory_isolator import MemoryIsolator
 from resolveai_api.guardrails.output_filter import OutputGuardrail
 from resolveai_api.mcp.toolbelt import ToolBelt
+from resolveai_api.observability import metrics as prom_metrics
 from resolveai_api.observability.tracing import get_tracer, span
 
 _TRACER = get_tracer("resolveai.supervisor")
@@ -265,6 +267,7 @@ class SupervisorGraph:
             kind = block_kind(flags, fail_closed=fail_closed)
             if kind is not BlockKind.NONE:
                 _emit_report(report_sink, all_flags)
+                prom_metrics.record_block("input", str(kind))
                 _set(ticket_span, "outcome", "blocked")
                 _set(ticket_span, "blocked_layer", "input")
                 _set(ticket_span, "blocked_kind", str(kind))
@@ -332,6 +335,7 @@ class SupervisorGraph:
                             out_kind = block_kind(out_flags, fail_closed=fail_closed)
                             if out_kind is not BlockKind.NONE:
                                 _emit_report(report_sink, all_flags)
+                                prom_metrics.record_block("output", str(out_kind))
                                 _set(agent_span, "blocked", True)
                                 _set(ticket_span, "outcome", "blocked")
                                 _set(ticket_span, "blocked_layer", "output")
@@ -368,6 +372,7 @@ class SupervisorGraph:
             except CrossTenantAccessBlockedError:
                 all_flags.append("cross_tenant_blocked")
                 _emit_report(report_sink, all_flags)
+                prom_metrics.record_block("tenant_isolation", str(BlockKind.TRUE_POSITIVE))
                 _set(ticket_span, "outcome", "blocked")
                 _set(ticket_span, "blocked_layer", "tenant_isolation")
                 with span(
@@ -379,6 +384,15 @@ class SupervisorGraph:
                     "data": json.dumps({"reason": ["cross_tenant_blocked"]}),
                 }
                 return
+            # Cost circuit-breaker outcome (M11): flag when the run blew its budget
+            # (the vertical loop already stopped spending; this surfaces the event).
+            from resolveai_api.eval.pricing import trace_cost_usd
+
+            budget_usd = getattr(settings, "cost_budget_usd", 0.0)
+            over_budget = is_over_budget(run_trace, budget_usd)
+            if over_budget and "cost:budget_exceeded" not in all_flags:
+                all_flags.append("cost:budget_exceeded")
+
             _emit_report(report_sink, all_flags)
             _set(ticket_span, "outcome", "done")
             _set(ticket_span, "flag_count", len(all_flags))
@@ -387,6 +401,16 @@ class SupervisorGraph:
                 layer: round(ms, 2) for layer, ms in guardrail_ms.items()
             }
             metrics["fail_closed"] = fail_closed
+            metrics["cost_budget_usd"] = budget_usd
+            metrics["over_budget"] = over_budget
+            prom_metrics.record_done(
+                cost_usd=trace_cost_usd(run_trace),
+                tokens=run_trace.total_tokens,
+                tool_calls=len(run_trace.tool_calls),
+                tool_errors=run_trace.tool_error_count,
+                guardrail_latency_ms=guardrail_ms,
+                over_budget=over_budget,
+            )
             _set(ticket_span, "total_tokens", metrics["tokens"])
             _set(ticket_span, "cost_usd", metrics["cost_usd"])
             yield {"type": "done", "data": json.dumps(metrics, default=str)}

@@ -168,6 +168,11 @@ class Settings(BaseSettings):
     )
     otel_service_name: str = Field(default="resolveai-api", alias="OTEL_SERVICE_NAME")
     evalgate_endpoint: str = Field(default="", alias="EVALGATE_ENDPOINT")
+    # Per-ticket modeled-cost budget (USD). When a run's accrued cost exceeds this,
+    # the vertical Plan-Execute / ReAct loop stops spending (protective degrade) and
+    # the Supervisor flags `cost:budget_exceeded`. `<= 0` disables the breaker.
+    # Default is deliberately generous for the demo; tighten in production profiles.
+    cost_budget_usd: float = Field(default=0.05, alias="COST_BUDGET_USD")
 
     # ---------- Tenant ----------
     default_tenant_id: str = Field(default="demo", alias="DEFAULT_TENANT_ID")

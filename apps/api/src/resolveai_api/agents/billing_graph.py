@@ -29,6 +29,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
+from resolveai_api.core.budget import over_cost_budget
 from resolveai_api.core.executor import Executor
 from resolveai_api.core.llm import make_llm, make_structured_llm
 
@@ -264,6 +265,10 @@ Decision = Literal["execute", "replan", "done"]
 
 
 def _route_after_executor(state: BillingState) -> Decision:
+    # Cost circuit-breaker (M11): stop spending once the run blows its budget.
+    # Finalize with observations gathered so far rather than firing more LLM hops.
+    if over_cost_budget():
+        return "done"
     if (state.get("iter_count") or 0) >= MAX_STEPS:
         return "done"
     if state.get("response") is not None:
@@ -273,6 +278,8 @@ def _route_after_executor(state: BillingState) -> Decision:
 
 def _route_after_replanner(state: BillingState) -> Decision:
     if state.get("response") is not None:
+        return "done"
+    if over_cost_budget():  # cost circuit-breaker (M11)
         return "done"
     if (state.get("iter_count") or 0) >= MAX_STEPS:
         return "done"
@@ -318,6 +325,8 @@ def build_billing_react(
         ]
         past_steps: list[tuple[str, str]] = []
         for _ in range(MAX_STEPS):
+            if over_cost_budget():  # cost circuit-breaker (M11)
+                break
             ai = await llm.ainvoke(convo)
             if not isinstance(ai, AIMessage):
                 ai = AIMessage(content=str(ai))
