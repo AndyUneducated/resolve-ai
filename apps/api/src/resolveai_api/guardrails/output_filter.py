@@ -14,6 +14,7 @@ import logging
 import re
 from typing import ClassVar
 
+from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
 from resolveai_api.config import get_settings
@@ -37,9 +38,9 @@ class PolicyJudge:
 
     def __init__(self, *, timeout_ms: int) -> None:
         self._timeout_s = max(timeout_ms, 100) / 1000.0
-        self._runnable = None  # built lazily on first judge() call
+        self._runnable: Runnable | None = None  # built lazily on first judge() call
 
-    def _build_runnable(self):
+    def _build_runnable(self) -> Runnable:
         settings = get_settings()
         if settings.llm_backend == "ollama":
             from langchain_ollama import ChatOllama

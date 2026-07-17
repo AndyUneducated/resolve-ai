@@ -7,7 +7,7 @@ FastAPI + LangGraph 多 Agent 编排服务。
 ```mermaid
 flowchart LR
   http["api/<br/>HTTP · SSE 路由"] --> sup["agents/<br/>Supervisor + 4 Agent"]
-  sup --> core["core/<br/>Planner · Memory · Tool · Executor"]
+  sup --> core["core/<br/>LLM 工厂 · Executor · 用量+成本 · Checkpointer"]
   core --> mcp["mcp/<br/>MCP 工具协议"]
   core --> ret["retrieval/<br/>Hybrid retrieval"]
   gr["guardrails/<br/>四层 defense-in-depth"] -.->|"包裹 输入/输出/执行/记忆"| sup
@@ -19,7 +19,7 @@ flowchart LR
 | 目录 | 职责 | 对应里程碑 |
 |---|---|---|
 | `agents/` | Supervisor + 4 个 Agent（Triage / Billing / Technical / Escalation）分工与编排 | [M2](../../docs/milestone-2-plan.md) · [M3](../../docs/milestone-3-plan.md) |
-| `core/` | 共享内核：Planner / Memory / Tool / Executor 四件套 | [M2](../../docs/milestone-2-plan.md) |
+| `core/` | 共享内核：LLM 工厂（cost-aware routing）· Executor（capability gate + sandbox）· 用量/成本（`capture_run`）· 预算熔断 · Checkpointer | [M2](../../docs/milestone-2-plan.md) · [M11](../../docs/milestone-11-plan.md) |
 | `guardrails/` | 四层 defense-in-depth（input / exec / output / memory） | [M4](../../docs/milestone-4-plan.md) · [M5](../../docs/milestone-5-plan.md) |
 | `mcp/` | MCP 工具协议：discovery + capability 白名单 | [M3](../../docs/milestone-3-plan.md) |
 | `retrieval/` | Hybrid retrieval（BM25 + dense + RRF + reranker） | [M6](../../docs/milestone-6-plan.md) |
