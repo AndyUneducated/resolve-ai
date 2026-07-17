@@ -12,10 +12,27 @@ processors:
 exporters:
   debug:
     verbosity: basic
+  # Forward spans to Tempo over OTLP gRPC.
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Re-expose collected span-derived metrics in Prometheus format (scraped by
+  # Prometheus at :8889). The app's business metrics come from its own /metrics.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+connectors:
+  # Derive RED metrics (rate/errors/duration) from traces so Grafana shows
+  # per-span latency without app changes.
+  spanmetrics: {}
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlp/tempo, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]

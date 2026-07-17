@@ -21,17 +21,70 @@ services:
       timeout: 5s
       retries: 10
 
-  # OTel collector (可选 — 留位给 EvalGate 集成)
+  # ---------------- Observability stack (M11 · `--profile obs`) ----------------
+  # trace → OTel Collector → Tempo; app /metrics → Prometheus; both → Grafana.
+  # Image tags are pinned (no `latest`) for reproducible dashboards.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.115.1
     container_name: resolveai-otel
     command: ["--config=/etc/otel-config.yaml"]
     volumes:
       - ./infra/docker/otel-config.yaml:/etc/otel-config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
+      - "4317:4317"   # OTLP gRPC (API exporter → collector)
       - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus-format metrics exposed by the collector
+    depends_on:
+      - tempo
+    profiles: ["obs"]
+
+  tempo:
+    image: grafana/tempo:2.7.0
+    container_name: resolveai-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/docker/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo query API (Grafana datasource)
+    profiles: ["obs"]
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: resolveai-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    volumes:
+      - ./infra/docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    # Scrape the API `/metrics` running on the host (`make api`) via host-gateway.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles: ["obs"]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: resolveai-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"   # Grafana UI (3000 is taken by the Next.js web app)
+    depends_on:
+      - prometheus
+      - tempo
     profiles: ["obs"]
 
 volumes:
   postgres_data:
+  tempo_data:
+  prometheus_data:
+  grafana_data:

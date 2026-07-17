@@ -1,6 +1,14 @@
 # Milestone 11 — 可观测闭环 & 成本治理
 
-**Status:** 📋 规划中。**地基已落地**：`core/usage.py` 的 `capture_run()` 每请求聚合 token（按 tier）与工具调用；`SupervisorGraph.stream` 已在 `done` 事件下发 `{tokens, input_tokens, output_tokens, cost_usd, tool_calls, usage_by_tier}` 并回填 `ticket.run` span 的 `total_tokens`/`cost_usd`；`eval/pricing.py` 提供成本模型；M8 已有 OTel `span()` helper（默认 no-op）。
+**Status:** ✅ 已实施（LM-free，`150 passed`）。落地内容：
+- **`/metrics` Prometheus 端点**：`observability/metrics.py`（进程级 counter/histogram，`prometheus_client` 缺失时优雅降级为 no-op，镜像 tracing.py 模式）+ `api/metrics.py` 路由。指标遵循 Prometheus 命名规范：`resolveai_tickets_total{outcome}`、`resolveai_guardrail_blocks_total{layer,kind}`、`resolveai_tool_calls_total`/`resolveai_tool_errors_total`、`resolveai_cost_budget_exceeded_total`、`resolveai_ticket_cost_usd`/`resolveai_ticket_tokens`/`resolveai_guardrail_latency_ms{layer}`（histogram）。
+- **成本预算 + 熔断**：`config.COST_BUDGET_USD`（宽松默认 `$0.05`，`<=0` 关闭）+ `core/budget.py`（`is_over_budget`/`over_cost_budget` 读活跃 `RunTrace`）。垂直 Plan-Execute 路由 + ReAct 循环在超预算时**停止继续花钱**（保护性降级，用已有观测收尾），Supervisor 打 `cost:budget_exceeded` 并在 `done` 事件带 `over_budget`/`cost_budget_usd`。
+- **可观测栈一键起**：`docker-compose.yml` 的 `--profile obs` 扩为 OTel Collector + Tempo（trace）+ Prometheus（scrape 宿主 `/metrics` + collector spanmetrics）+ Grafana（预置 datasource + `ResolveAI — Agent Ops & Cost` dashboard），镜像全部 pin tag。`make obs` / `make obs-down` / `make metrics`。
+- **OTel 真实导出**：`observability/tracing.py` 早已接 `OTLPSpanExporter` 且依赖已在 `pyproject`（`opentelemetry-*`），本次补齐 collector → Tempo 的下游。
+- **成本回归门**：`scripts/regression_gate.py` 的 `_GUARDED` 早已含 `mean_cost_usd`（涨价超阈值即非零退出）；本次加 `test_regression_gate_flags_cost_increase` 锁定该行为。
+- **测试**：`test_observability.py`（纯预算数学、路由熔断、指标记录器、`/metrics` 端点、fake backend 端到端熔断）+ `test_m8.py` 成本回归用例。
+
+**原始地基**：`core/usage.py` 的 `capture_run()` 每请求聚合 token（按 tier）与工具调用；`SupervisorGraph.stream` 已在 `done` 事件下发 `{tokens, input_tokens, output_tokens, cost_usd, tool_calls, usage_by_tier}` 并回填 `ticket.run` span 的 `total_tokens`/`cost_usd`；`eval/pricing.py` 提供成本模型；M8 已有 OTel `span()` helper（默认 no-op）。
 
 **Goal:** 把「no-op span + 每请求成本」接成完整可观测闭环：**trace → OTel Collector → Tempo/Prometheus → Grafana**，并加上**每请求成本预算 + 熔断**与**成本回归门**。
 
@@ -72,8 +80,8 @@ flowchart LR
 
 ## 5. 验收
 
-- [ ] `docker compose -f docker-compose.observability.yml up` 后 Grafana 能看到真实 trace + 指标（镜像已 pin）
-- [ ] 超预算 ticket 触发熔断降级并打 `cost:budget_exceeded`，端到端测试覆盖（fake backend）
-- [ ] `/metrics` 暴露规范命名的 Prometheus 指标，pytest 抓取断言
-- [ ] 成本回归门在 CI 生效（模拟涨价用例非零退出）
-- [ ] 新增测试全绿，`ruff`/`mypy` 不新增错误
+- [x] `docker compose --profile obs up`（`make obs`）起 OTel Collector + Tempo + Prometheus + Grafana，Grafana 预置 `ResolveAI — Agent Ops & Cost` dashboard（镜像已 pin）
+- [x] 超预算 ticket 触发熔断降级并打 `cost:budget_exceeded`，端到端测试覆盖（fake backend，`test_cost_budget_breaker_end_to_end`）
+- [x] `/metrics` 暴露规范命名的 Prometheus 指标，pytest 抓取断言（`test_metrics_endpoint_exposes_prometheus_families`）
+- [x] 成本回归门在 CI 生效（`mean_cost_usd`，模拟涨价用例非零退出，`test_regression_gate_flags_cost_increase`）
+- [x] 新增测试全绿（`150 passed`），`ruff` 通过，`mypy` 维持 58 基线

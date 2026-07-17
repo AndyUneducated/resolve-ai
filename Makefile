@@ -1,5 +1,5 @@
 .PHONY: help install dev api web seed db-migrate test red-team lint fmt typecheck clean \
-	chaos regression-gate demo-assets demo-record obs
+	chaos regression-gate demo-assets demo-record obs obs-down metrics
 
 # Owner/superuser DSN for DDL (RLS migration). resolveai_app lacks DDL rights, so
 # this must run as the owner. Override for a remote/CI DB: make db-migrate MIGRATE_DSN=...
@@ -16,10 +16,12 @@ help:
 	@echo "  test            跑 pytest + frontend lint"
 	@echo "  red-team        跑 200 个 adversarial prompt"
 	@echo "  chaos           5K mock ticket 并发压测（M8，默认 fake backend）"
-	@echo "  regression-gate online regression 门禁（对比 baseline）"
+	@echo "  regression-gate online regression 门禁（对比 baseline，含 mean_cost_usd 成本回归）"
 	@echo "  demo-assets     生成 demo 用 metrics.html / trace.html"
 	@echo "  demo-record     生成 assets 后用 Playwright 录制 demo 视频"
-	@echo "  obs             启动本地 OTel collector（--profile obs）"
+	@echo "  obs             启动可观测栈：OTel collector + Tempo + Prometheus + Grafana（--profile obs）"
+	@echo "  obs-down        拆掉可观测栈"
+	@echo "  metrics         curl 本地 /metrics（需先 make api）"
 	@echo "  lint            ruff + eslint"
 	@echo "  fmt             ruff format + prettier"
 	@echo "  typecheck       mypy + tsc"
@@ -71,7 +73,17 @@ demo-record: demo-assets
 	cd apps/web && npm run demo:record
 
 obs:
+	# OTel collector (4317/4318) + Tempo (3200) + Prometheus (9090) + Grafana (3001).
+	# Grafana is anonymous-admin at http://localhost:3001 with a pre-provisioned
+	# ResolveAI dashboard; Prometheus scrapes the host API /metrics (run `make api`).
 	docker compose --profile obs up
+
+obs-down:
+	docker compose --profile obs down
+
+metrics:
+	@curl -s http://localhost:8000/metrics | grep -E '^resolveai_' || \
+		echo "no resolveai_* metrics yet (run some tickets), or API not up (make api)"
 
 lint:
 	uv run ruff check .

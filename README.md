@@ -23,7 +23,7 @@
 | 工具协议 (Tool Protocol) | [MCP](https://modelcontextprotocol.io/) |
 | 检索 (Retrieval) | [pgvector](https://github.com/pgvector/pgvector) · [BM25](https://github.com/dorianbrown/rank_bm25) |
 | 护栏 (Guardrails) | [Presidio](https://microsoft.github.io/presidio/) · [gVisor](https://gvisor.dev/) |
-| 可观测性 (Observability) | [OpenTelemetry](https://opentelemetry.io/) |
+| 可观测性 (Observability) | [OpenTelemetry](https://opentelemetry.io/) · [Prometheus](https://prometheus.io/) · [Grafana](https://grafana.com/) · [Tempo](https://grafana.com/oss/tempo/)（`/metrics` + trace→Collector→Tempo/Prometheus→Grafana，`make obs`） |
 | 测试 (Testing) | [pytest](https://docs.pytest.org/) |
 | 前端 (Frontend) | [Next.js 15](https://nextjs.org/) · [React 19](https://react.dev/) · [TypeScript 5](https://www.typescriptlang.org/) · [Tailwind CSS](https://tailwindcss.com/) · [ESLint 9](https://eslint.org/) |
 | 部署 (Deploy) | [Docker Compose](https://docs.docker.com/compose/) |
@@ -213,7 +213,7 @@ resolve-ai/
 │   ├── roadmap.md          # 里程碑 + 设计决策
 │   ├── milestone-*-plan.md # 各里程碑技术方案
 │   └── demo/               # 3 分钟 demo 旁白 + 分镜
-├── docker-compose.yml      # Postgres + pgvector / OTel collector（--profile obs）
+├── docker-compose.yml      # Postgres + pgvector / 可观测栈 OTel+Tempo+Prometheus+Grafana（--profile obs）
 ├── Makefile                # 一键 dev / lint / test
 ├── pyproject.toml          # Python workspace (uv) 根配置
 └── .env.example

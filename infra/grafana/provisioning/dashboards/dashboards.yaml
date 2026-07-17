@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: ResolveAI
+    orgId: 1
+    folder: ResolveAI
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 15
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

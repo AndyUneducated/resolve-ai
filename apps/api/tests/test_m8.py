@@ -224,6 +224,21 @@ def test_regression_gate_flags_latency_and_resolve_drop():
     assert any("auto_resolve_rate" in v for v in violations)
 
 
+def test_regression_gate_flags_cost_increase():
+    """M11 cost gate: a per-ticket cost jump beyond threshold must fail CI."""
+    import regression_gate
+
+    current = {
+        "p95_latency_ms": 1000.0,
+        "mean_cost_usd": 0.002,          # +100% > 50% allowed
+        "auto_resolve_rate": 0.9,
+        "tool_error_rate": 0.05,
+    }
+    violations = regression_gate._check_regressions(current, _baseline())
+    assert len(violations) == 1
+    assert any("mean_cost_usd" in v for v in violations)
+
+
 # --------------------------------------------------------------------------- #
 # OTel span helper (no-op when tracer is None)
 # --------------------------------------------------------------------------- #

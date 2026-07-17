@@ -1,6 +1,6 @@
 # Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）已实施**；**M11–M15 规划中**。
+当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10（生产级护栏 & 真沙箱）+ M11（可观测闭环 & 成本治理）已实施**；**M12–M15 规划中**。
 
 > **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
 > `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
@@ -42,8 +42,8 @@ flowchart LR
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
   class M1,M2,M3,M4,M6 base;
-  class M5,M7,M8,M9,M10 star;
-  class M11,M12,M13,M14,M15 plan;
+  class M5,M7,M8,M9,M10,M11 star;
+  class M12,M13,M14,M15 plan;
 ```
 
 ### 一览表（at a glance）
@@ -60,7 +60,7 @@ flowchart LR
 | M8 | Chaos Demo & 视频 | ⭐ | 5K 并发压测 + online regression gate + demo 视频 | ✅ |
 | M9 | 多租户硬隔离（RLS） | ⭐ | Postgres Row-Level Security 兜底应用层 bug | ✅ |
 | **M10** | 生产级护栏 & 真沙箱 | ⭐ | fail-closed 默认 + 真实 rlimit 沙箱 + 逃逸测试量化 | ✅ |
-| **M11** | 可观测闭环 & 成本治理 | ⭐ | OTel→Collector→Grafana + 每请求成本预算 + 熔断 | 📋 |
+| **M11** | 可观测闭环 & 成本治理 | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + 成本预算熔断 + 成本回归门 | ✅ |
 | **M12** | Human-in-the-Loop 接力 | ⭐ | LangGraph `interrupt` 审批 + 断点续聊 + 坐席交接 | 📋 |
 | **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 语义缓存降本降延迟 | 📋 |
 | **M14** | Eval→数据飞轮 | ⭐ | 生产 trace 自动回灌 eval 集 + 回归门在线自改进 | 📋 |
@@ -275,16 +275,16 @@ flowchart LR
 
 详细技术方案见 [`docs/milestone-10-plan.md`](milestone-10-plan.md)。
 
-## Milestone 11 · 可观测闭环 & 成本治理（3 days）⭐ — 📋 Planned
+## Milestone 11 · 可观测闭环 & 成本治理（3 days）⭐ — ✅ Done
 
 > **目标**：把 M8 的 no-op OTel span 和本次落地的每请求成本，接成"trace→collector→dashboard"的闭环，并加上成本预算 / 熔断。
 
 - **已落地地基**：`core/usage.capture_run` 每请求 token/成本聚合 + `/chat` `done` 事件下发 + `eval/pricing` 成本模型；OTel span helper（M8）。
-- [ ] OTel exporter 接真实 **Collector → Tempo/Jaeger + Prometheus + Grafana**（docker-compose 一键起），span 变有效导出
-- [ ] Grafana dashboard：auto-resolve rate、每 tier token/成本、护栏拦截分层、P50/P95 latency、tool 错误率
-- [ ] **每请求成本预算 + 熔断**：超预算的 ticket 主动降级（停用高价 tier / 截断 plan）并打 flag
-- [ ] `/metrics` Prometheus 端点 + `done` 事件成本回填到 trace 属性（本次已埋 `total_tokens`/`cost_usd`）
-- [ ] 成本回归门：CI 对比基线，单 ticket 平均成本上涨超阈值即失败（复用 `regression_gate.py`）
+- [x] OTel exporter 接真实 **Collector → Tempo + Prometheus + Grafana**（`make obs` 一键起，镜像 pin），span 有效导出 + spanmetrics RED
+- [x] Grafana 预置 dashboard：ticket 速率/outcome、护栏拦截分层(kind)、成本 p50/p95、护栏延迟 p95、tool 错误率、预算熔断、tokens p95
+- [x] **每请求成本预算 + 熔断**：`COST_BUDGET_USD` + `core/budget.py`，超预算时垂直循环停止花钱并打 `cost:budget_exceeded`
+- [x] `/metrics` Prometheus 端点（`observability/metrics.py` + `api/metrics.py`）+ `done` 事件回填 `over_budget`/`cost_budget_usd`
+- [x] 成本回归门：`regression_gate.py` 的 `mean_cost_usd` 维度 + 单测锁定（涨价即非零退出）
 
 详细技术方案见 [`docs/milestone-11-plan.md`](milestone-11-plan.md)。
 

@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ResolveAI API business metrics (resolveai_*). The API runs on the host via
+  # `make api`; host.docker.internal resolves to the host from inside the container.
+  - job_name: resolveai-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: resolveai-api
+
+  # OTel Collector span-derived RED metrics (rate/errors/duration).
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8889"]
+        labels:
+          service: otel-collector
+
+  # Prometheus self-scrape.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
