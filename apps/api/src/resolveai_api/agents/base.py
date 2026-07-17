@@ -1,7 +1,7 @@
 """Base class for all agents — holds config + filtered MCP tools + Executor.
 
-Each Agent receives a **pre-filtered** `list[BaseTool]` (filtered by its
-`TOOL_WHITELIST` via `mcp/loader.py:filter_by_whitelist`); enforcing the
+Each Agent receives a **pre-filtered** `list[BaseTool]` (sliced to its
+`TOOL_WHITELIST` via `mcp/toolbelt.py:ToolBelt.for_agent`); enforcing the
 whitelist again happens at call-time in [`core/executor.py`](../core/executor.py).
 """
 
@@ -14,6 +14,18 @@ from langchain_core.tools import BaseTool
 
 from resolveai_api.agents.state import AgentName, GraphState
 from resolveai_api.core.executor import Executor
+
+
+def find_tool(tools: list[BaseTool], full_name: str) -> BaseTool | None:
+    """Return the tool whose dot-form `metadata.full_name` matches, else None.
+
+    Shared by the agents that reach for a specific MCP tool by name (technical /
+    escalation), so the lookup lives in one place.
+    """
+    for tool in tools:
+        if (tool.metadata or {}).get("full_name") == full_name:
+            return tool
+    return None
 
 
 @dataclass

@@ -9,8 +9,8 @@ Names follow Prometheus conventions (`_total` suffix for counters, base units in
 the name). Label cardinality is kept low on purpose (no tenant/customer labels —
 those belong in traces, not metrics):
 
-- ``resolveai_tickets_total{outcome}``              — done | blocked
-- ``resolveai_guardrail_blocks_total{layer,kind}``  — input|output × true_positive|degraded|...
+- ``resolveai_tickets_total{outcome}``              — done | blocked | awaiting_approval | human_owned
+- ``resolveai_guardrail_blocks_total{layer,kind}``  — input|output|tenant_isolation × true_positive|degraded|...
 - ``resolveai_tool_calls_total``                    — MCP tool invocations
 - ``resolveai_tool_errors_total``                   — tool invocations that errored
 - ``resolveai_cost_budget_exceeded_total``          — runs over the per-ticket budget
@@ -95,6 +95,12 @@ def record_awaiting(pending: int = 1) -> None:
     TICKETS.labels(outcome="awaiting_approval").inc()
     if pending > 0:
         APPROVALS_PENDING.inc(pending)
+
+
+def record_human_owned() -> None:
+    """Count one ticket short-circuited because a human agent owns the thread (M12)."""
+    if _AVAILABLE:
+        TICKETS.labels(outcome="human_owned").inc()
 
 
 def record_cache_hit() -> None:

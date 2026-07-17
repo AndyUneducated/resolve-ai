@@ -126,14 +126,3 @@ async def load_tools(
         server, _, raw = name.partition("_")
         annotated.append(_annotate(tool, server=server, tool_name=raw or name))
     return annotated
-
-
-def filter_by_whitelist(tools: list[BaseTool], whitelist: list[str]) -> list[BaseTool]:
-    """Keep only tools whose `metadata.full_name` is in `whitelist`.
-
-    The whitelist uses dot-form (`stripe.refund`); MCP adapter prefixes with
-    underscore (`stripe_refund`). We match on `metadata["full_name"]` populated
-    by `_annotate`.
-    """
-    allowed = set(whitelist)
-    return [t for t in tools if (t.metadata or {}).get("full_name") in allowed]

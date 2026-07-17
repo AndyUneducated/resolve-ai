@@ -38,6 +38,28 @@ TOOL_WHITELIST = [
 ]
 
 
+def _finalize(response: Any, past_steps: list[tuple[str, str]]) -> tuple[str, bool]:
+    """Map a billing sub-graph result to (customer_text, escalate).
+
+    Pure + side-effect-free so the escalation decision is unit-testable. The
+    third branch (no response, no steps = ran out of iteration/cost budget)
+    MUST escalate: the text promises a handoff, so the flag has to make the
+    Supervisor actually route to the escalation node (else the ticket dead-ends).
+    """
+    if response is not None:
+        return response.final_answer, bool(response.escalate)
+    if past_steps:
+        summary = "I've worked on your billing issue:\n" + "\n".join(
+            f"- {s}: {o}" for s, o in past_steps[-3:]
+        )
+        return summary, False
+    return (
+        "I couldn't make progress on this billing ticket within the iteration "
+        "budget. Escalating.",
+        True,
+    )
+
+
 class BillingAgent(BaseAgent):
     """Compiles a per-instance billing sub-graph from filtered tools.
 
@@ -93,18 +115,7 @@ class BillingAgent(BaseAgent):
 
         response = result.get("response")
         past_steps = result.get("past_steps") or []
-        escalate = bool(response.escalate) if response is not None else False
-        if response is not None:
-            assistant_text = response.final_answer
-        elif past_steps:
-            assistant_text = "I've worked on your billing issue:\n" + "\n".join(
-                f"- {s}: {o}" for s, o in past_steps[-3:]
-            )
-        else:
-            assistant_text = (
-                "I couldn't make progress on this billing ticket within the iteration "
-                "budget. Escalating."
-            )
+        assistant_text, escalate = _finalize(response, past_steps)
 
         tool_calls = list(state.get("tool_calls") or [])
         for step, observation in past_steps:

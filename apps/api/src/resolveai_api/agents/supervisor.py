@@ -262,6 +262,7 @@ class SupervisorGraph:
         # automation — surface ownership so the caller routes to the live agent.
         store = get_approval_store()
         if store.is_human_owned(namespace):
+            prom_metrics.record_human_owned()
             yield {
                 "type": "human_owned",
                 "data": json.dumps(

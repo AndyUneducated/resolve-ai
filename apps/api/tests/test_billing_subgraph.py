@@ -113,6 +113,91 @@ async def test_plan_execute_replan_completes() -> None:
     assert result.get("plan") in (None, [])
 
 
+class _RaisingTool(BaseTool):
+    """Granted (whitelisted) tool whose invocation raises a non-permission error."""
+
+    name: str = "stripe_refund"
+    description: str = "stub that raises upstream"
+    metadata: ClassVar[dict[str, Any]] = {
+        "server": "stripe",
+        "capability": "write",
+        "full_name": "stripe.refund",
+    }
+
+    def _run(self, *args, **kwargs):  # pragma: no cover — async path used
+        raise RuntimeError("upstream 500")
+
+    async def _arun(self, *args, **kwargs):
+        raise RuntimeError("upstream 500")
+
+
+class _CallRaisingToolLLM:
+    """Executor LLM that always tries to call the raising tool."""
+
+    def bind_tools(self, tools):
+        return self
+
+    async def ainvoke(self, messages):
+        return AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "stripe_refund",
+                    "args": {"charge_id": "ch_001", "amount": 100},
+                    "id": "call_1",
+                    "type": "tool_call",
+                }
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_plan_execute_records_tool_error_instead_of_crashing() -> None:
+    """A tool that raises should be recorded as an observation, not crash the graph.
+
+    Regression test: the plan-execute executor node previously caught only
+    PermissionError, so a real tool/network error propagated and killed the
+    whole sub-graph (the ReAct loop already handled this).
+    """
+    plan = Plan(steps=["issue the refund"])
+    finalize = Replan(
+        plan=None,
+        response=Response(final_answer="Escalating after tool failure.", escalate=True),
+    )
+
+    def fake_make_structured_llm(_tier, schema):
+        return _FixedStructuredLLM([{Plan: plan, Replan: finalize}[schema]])
+
+    with (
+        patch(
+            "resolveai_api.agents.billing_graph.make_structured_llm",
+            side_effect=fake_make_structured_llm,
+        ),
+        patch(
+            "resolveai_api.agents.billing_graph.make_llm",
+            return_value=_CallRaisingToolLLM(),
+        ),
+    ):
+        graph = build_billing_subgraph(
+            tools=[_RaisingTool()], whitelist=["stripe.refund"]
+        )
+        result = await graph.ainvoke(
+            {
+                "messages": [],
+                "ticket_summary": {"intent": "billing", "entities": {}},
+                "plan": [],
+                "past_steps": [],
+                "iter_count": 0,
+            }
+        )
+
+    # Graph completed (no exception) and the failure was captured as an observation.
+    assert result["response"] is not None
+    observations = " ".join(o for _, o in result["past_steps"])
+    assert "error" in observations.lower()
+    assert "upstream 500" in observations
+
+
 @pytest.mark.asyncio
 async def test_max_steps_truncates_runaway_loop() -> None:
     """Replanner that always returns 'continue' should not loop forever."""

@@ -215,6 +215,11 @@ def _build_executor_node(tools: list[BaseTool], executor: Executor, whitelist: l
                 )
             except PermissionError as exc:
                 observation_parts.append(f"{tname} blocked by capability whitelist: {exc}")
+            except Exception as exc:
+                # Tool / network error: record it as an observation and let the
+                # replanner react (mirrors the ReAct loop), instead of letting the
+                # exception crash the whole sub-graph.
+                observation_parts.append(f"{tname} error: {exc}")
 
         observation = "\n".join(observation_parts) or "(no-op)"
         past_steps.append((current_step, observation))

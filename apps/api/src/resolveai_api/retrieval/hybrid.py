@@ -20,6 +20,7 @@ from langchain_core.embeddings import Embeddings
 
 from resolveai_api.config import get_settings
 from resolveai_api.guardrails.attribution import flag_enabled
+from resolveai_api.observability.tracing import get_tracer, span
 from resolveai_api.retrieval.fusion import reciprocal_rank_fusion
 from resolveai_api.retrieval.reranker import Reranker
 from resolveai_api.retrieval.semantic_cache import SemanticCache
@@ -31,25 +32,14 @@ logger = logging.getLogger(__name__)
 # Re-export so existing imports (`from ...retrieval.hybrid import RetrievedDoc`) keep working.
 __all__ = ["HybridRetriever", "RetrievalTrace", "RetrievedDoc"]
 
-
-def _tracer():
-    """Return an OTel tracer if the SDK is importable; no-op otherwise.
-
-    `start_as_current_span` is a cheap no-op when no provider is configured
-    (tracing.py only installs one when OTEL endpoint is set), so this is safe
-    to call unconditionally.
-    """
-    try:
-        from opentelemetry import trace
-
-        return trace.get_tracer("resolveai.retrieval")
-    except Exception:  # pragma: no cover - OTel always present in deps
-        return None
+# Shared tracer helper (no-op unless an OTel provider is installed) — same one the
+# executor / supervisor use, instead of a bespoke local bootstrap.
+_TRACER = get_tracer("resolveai.retrieval")
 
 
-def _annotate_span(span: object, trace: RetrievalTrace) -> None:
+def _annotate_span(otel_span: object, trace: RetrievalTrace) -> None:
     """Attach retrieval attributes to the active span (no-op if span is None)."""
-    set_attr = getattr(span, "set_attribute", None)
+    set_attr = getattr(otel_span, "set_attribute", None)
     if not callable(set_attr):
         return
     try:
@@ -60,6 +50,7 @@ def _annotate_span(span: object, trace: RetrievalTrace) -> None:
         set_attr("retrieval.lexical_count", len(trace.lexical_ids))
         set_attr("retrieval.result_ids", str(trace.result_ids))
         set_attr("retrieval.reranked", trace.reranked)
+        set_attr("retrieval.cache_hit", trace.cache_hit)
         set_attr("retrieval.latency_ms", trace.latency_ms)
     except Exception:  # pragma: no cover - defensive
         pass
@@ -137,17 +128,9 @@ class HybridRetriever:
         """同 `search`，但额外返回 `RetrievalTrace`（doc ids / 各路 / latency）。"""
         rrf_k = rrf_k or self._rrf_k
         trace = RetrievalTrace(query=query, tenant_id=tenant_id, profile=self._profile)
-        tracer = _tracer()
         start = time.perf_counter()
 
-        from contextlib import nullcontext
-
-        span_cm = (
-            tracer.start_as_current_span("retrieval.search")
-            if tracer is not None
-            else nullcontext()
-        )
-        with span_cm as span:
+        with span(_TRACER, "retrieval.search") as retrieval_span:
             try:
                 # Semantic cache (M13): embed once up-front, reuse the vector for
                 # both the cache lookup and (on miss) the dense round-trip.
@@ -180,7 +163,7 @@ class HybridRetriever:
                     )
             finally:
                 trace.latency_ms = (time.perf_counter() - start) * 1000.0
-                _annotate_span(span, trace)
+                _annotate_span(retrieval_span, trace)
         logger.info("retrieval_done %s", trace.as_dict())
         return docs, trace
 

@@ -19,9 +19,8 @@ import json
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.tools import BaseTool
 
-from resolveai_api.agents.base import AgentConfig, BaseAgent
+from resolveai_api.agents.base import AgentConfig, BaseAgent, find_tool
 from resolveai_api.agents.state import GraphState
 
 SYSTEM_PROMPT = """\
@@ -45,13 +44,6 @@ TOOL_WHITELIST = [
 ]
 
 DEFAULT_ONCALL_CHANNEL = "#oncall-billing"
-
-
-def _find_tool(tools: list[BaseTool], full_name: str) -> BaseTool | None:
-    for tool in tools:
-        if (tool.metadata or {}).get("full_name") == full_name:
-            return tool
-    return None
 
 
 def _intent_to_channel(intent: str | None) -> str:
@@ -108,7 +100,7 @@ class EscalationAgent(BaseAgent):
         outcomes: list[str] = []
 
         # 1) Slack notify (capability=write — must be granted)
-        notify_tool = _find_tool(self.tools, "slack.notify_team")
+        notify_tool = find_tool(self.tools, "slack.notify_team")
         if notify_tool is not None:
             try:
                 result = await self.executor.call_tool(
@@ -129,7 +121,7 @@ class EscalationAgent(BaseAgent):
             outcomes.append("Slack MCP not configured; logged escalation locally.")
 
         # 2) Zendesk escalate (capability=destructive — must be granted)
-        escalate_tool = _find_tool(self.tools, "zendesk.escalate")
+        escalate_tool = find_tool(self.tools, "zendesk.escalate")
         if escalate_tool is not None:
             try:
                 result = await self.executor.call_tool(

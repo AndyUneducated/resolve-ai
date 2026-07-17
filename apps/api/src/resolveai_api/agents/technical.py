@@ -16,10 +16,9 @@ import logging
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from resolveai_api.agents.base import AgentConfig, BaseAgent
+from resolveai_api.agents.base import AgentConfig, BaseAgent, find_tool
 from resolveai_api.agents.state import GraphState
 from resolveai_api.core.llm import make_structured_llm
 from resolveai_api.guardrails.retrieval_filter import scan_chunks
@@ -68,13 +67,6 @@ class TechnicalAnswer(BaseModel):
         default_factory=list, description="KB doc IDs actually relied upon."
     )
     escalate: bool = Field(default=False)
-
-
-def _find_tool(tools: list[BaseTool], full_name: str) -> BaseTool | None:
-    for tool in tools:
-        if (tool.metadata or {}).get("full_name") == full_name:
-            return tool
-    return None
 
 
 def _latest_user_query(messages: list[BaseMessage], ticket_summary: dict[str, Any]) -> str:
@@ -197,7 +189,7 @@ class TechnicalAgent(BaseAgent):
         guardrail_flags.extend(kb_flags)
 
         # ---- 2. Zendesk history (supplementary context, M3 behavior retained) ----
-        history_tool = _find_tool(self.tools, "zendesk.get_ticket_history")
+        history_tool = find_tool(self.tools, "zendesk.get_ticket_history")
         if history_tool is not None and customer_id:
             try:
                 result = await self.executor.call_tool(
