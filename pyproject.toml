@@ -5,8 +5,9 @@ description = "Adversarially-Hardened Multi-Agent Customer Support — workspace
 readme = "README.md"
 requires-python = ">=3.12"
 
-# 顶层不直接发布，只是 workspace 容器；声明所有成员以便 `uv sync`（无需 --all-packages）
-# 自动把 API 与 5 个 MCP server 一起装进 .venv，方便 `python -m mcp_servers.stripe`。
+# The root is a workspace container and is not published directly. Declaring all members lets
+# `uv sync` install the API and all five MCP servers into .venv without --all-packages,
+# enabling commands such as `python -m mcp_servers.stripe`.
 dependencies = [
     "resolveai-api",
     "mcp-server-zendesk",
@@ -58,7 +59,7 @@ extend-exclude = ["apps/web", ".venv", "build", "dist"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "RUF", "SIM"]
-# RUF001/RUF002/RUF003: 中英混排里常见全角标点，与 ASCII 混用会误报
+# RUF001/RUF002/RUF003: full-width punctuation mixed with ASCII can cause false positives
 ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]

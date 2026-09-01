@@ -1,10 +1,13 @@
-"""检索后 guardrail — 对召回 chunk 做间接注入 / KB 投毒扫描。
+"""Post-retrieval guardrail for indirect injection and KB poisoning scans.
 
-补 M5 缺口：L1 `input_filter` 只扫用户输入，不扫 RAG 召回内容。真实 hybrid
-检索上线后，被投毒的 KB 文档可能绕过"用户输入"检测，因此在检索出口加这一层。
+This closes an M5 gap: L1 `input_filter` scans only user input, not RAG
+retrieval results. Once real hybrid retrieval is enabled, poisoned KB documents
+could bypass user-input detection, so this layer scans the retrieval output.
 
-调库优先：复用 L1 `InputGuardrail.INDIRECT_INJECTION_PATTERNS`，不另立一套规则。
-纯函数、无外呼，便于单测，也便于 M7/M8 把"被污染文档命中数"纳入指标。
+Prefer reuse over custom logic: use L1
+`InputGuardrail.INDIRECT_INJECTION_PATTERNS` rather than defining another rule
+set. This pure function makes unit testing straightforward and lets M7/M8
+include the number of retrieved poisoned documents in their metrics.
 """
 
 from __future__ import annotations
@@ -23,9 +26,10 @@ class ChunkScanResult:
 
 
 def scan_chunks(docs: list[RetrievedDoc]) -> ChunkScanResult:
-    """扫描召回文档；命中注入模式的文档被隔离（不进 LLM context）。
+    """Scan retrieved documents and quarantine injection-pattern matches.
 
-    返回过滤后的 safe_docs + 被隔离 doc id + 标记（供 guardrail_flags 归因）。
+    Quarantined documents do not enter the LLM context. Return filtered safe
+    documents, quarantined document IDs, and attribution flags.
     """
     patterns = [p.lower() for p in InputGuardrail.INDIRECT_INJECTION_PATTERNS]
     safe: list[RetrievedDoc] = []

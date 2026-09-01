@@ -1,7 +1,7 @@
 [project]
 name = "resolveai-api"
 version = "0.0.1"
-description = "ResolveAI · FastAPI + LangGraph 多 Agent 编排后端"
+description = "ResolveAI · FastAPI + LangGraph multi-agent orchestration backend"
 requires-python = ">=3.12"
 dependencies = [
     # Web
@@ -45,8 +45,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 精排重依赖（torch 等）独立成组，base 安装保持轻量；
-# Reranker 未装时自动降级到 RRF 融合排序（见 retrieval/reranker.py）。
+# Keep heavy reranking dependencies (such as torch) in a separate group so the base
+# installation remains lightweight. Without the reranker, fall back automatically
+# to RRF fusion ranking (see retrieval/reranker.py).
 rerank = [
     "sentence-transformers>=3.0",
 ]

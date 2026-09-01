@@ -1,8 +1,9 @@
 """ToolBelt — single source of truth for MCP-backed LangChain tools.
 
-行业对齐（2026）：MCP discovery + LangChain `BaseTool` 桥接是事实标准；本类
-把 [`mcp/loader.py`](loader.py) 的发现/标注流程封装为可注入对象，并提供
-per-agent slicing 与 JSON manifest（给 /admin / ablation log 用）。
+Industry-aligned approach (2026): MCP discovery and the LangChain `BaseTool`
+bridge are the de facto standard. This class wraps the discovery and annotation
+flow from [`mcp/loader.py`](loader.py) as an injectable object and provides
+per-agent slicing plus a JSON manifest for /admin and ablation logs.
 
 Why a class instead of bare functions:
 - One place to compute & cache the capability map (decision 4 · Layer 2).

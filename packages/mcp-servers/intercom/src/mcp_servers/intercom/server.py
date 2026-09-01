@@ -1,6 +1,6 @@
 """Intercom Mock MCP Server (real impl using the official `mcp` Python SDK).
 
-工具：
+Tools:
 - get_conversation(conversation_id) → Conversation         (capability=read)
 - tag_user(user_id, tag) → User                            (capability=write)
 

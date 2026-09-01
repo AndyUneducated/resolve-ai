@@ -1,16 +1,18 @@
 """Escalation Agent — deterministic human handoff (M3).
 
-M3 设计要点：升级流程本身就是几条**确定性步骤**（通知 on-call、把 ticket 标
-为 escalated），不需要 LLM 在工具之间反复试错。Agent 直接通过 MCP 工具完成：
+M3 design: escalation consists of deterministic steps (notify on-call and mark
+the ticket as escalated), so an LLM does not need to repeatedly try tools. The
+agent completes the process directly through MCP tools:
 
   slack.notify_team      (capability=write, must be granted)
   zendesk.escalate       (capability=destructive, must be granted)
 
-如果某条工具未发现（MCP server 没启），就降级到「最佳努力」记录到
-`tool_calls`，但 final answer 仍说明已升级——便于 dev 环境 demo。
+If a tool is unavailable because its MCP server is disabled, degrade to
+best-effort recording in `tool_calls`; the final answer still states that the
+case was escalated to support development demos.
 
-M4 在此基础上接 Layer 3 输出 cross-check（确认 Slack/Zendesk 真返回了
-escalation id；目前 mock store 返回 dict）。
+M4 adds a Layer 3 output cross-check to confirm that Slack/Zendesk actually
+returned an escalation ID; the mock store currently returns a dictionary.
 """
 
 from __future__ import annotations

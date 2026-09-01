@@ -1,93 +1,92 @@
-# 贡献指南 / Contributing
+# Contributing
 
-欢迎为 ResolveAI 提 issue 或 PR —— 尤其欢迎以下方向：
+Issues and PRs for ResolveAI are welcome — especially in these areas:
 
-- 新增 MCP server（在现有 5 个 SaaS mock 之外）。
-- 补强四层护栏（guardrails）的任意一层（input / exec / output / memory）。
-- 扩充对抗集（200 条 adversarial prompt 在 [`apps/api/tests/fixtures/red_team.jsonl`](apps/api/tests/fixtures/red_team.jsonl)，入口脚本 [`scripts/eval_adversarial.py`](scripts/eval_adversarial.py)）。
-- 接入新的 LLM provider 或路由（routing）策略。
+- New MCP servers (beyond the existing 5 SaaS mocks).
+- Strengthening any of the four guardrail layers (input / exec / output / memory).
+- Expanding the adversarial set (200 adversarial prompts in [`apps/api/tests/fixtures/red_team.jsonl`](apps/api/tests/fixtures/red_team.jsonl), harness [`scripts/eval_adversarial.py`](scripts/eval_adversarial.py)).
+- New LLM providers or routing strategies.
 
-## 提交流程一图
+## Contribution flow at a glance
 
 ```mermaid
 flowchart LR
-  setup["1 准备环境<br/>uv sync · npm install · seed"] --> dev["2 启动 dev<br/>make dev"]
-  dev --> code["改代码"]
-  code --> check["3 提交前自检<br/>make lint · typecheck · test · red-team"]
-  check -->|未过| code
-  check -->|全绿| pr["开 PR<br/>说明 为什么/改了什么/怎么测"]
-  pr --> ci{"CI：backend + frontend"}
-  ci -->|失败| code
-  ci -->|通过| merge["合并 Merge"]
+  setup["1 Set up<br/>uv sync · npm install · seed"] --> dev["2 Start dev<br/>make dev"]
+  dev --> code["Change code"]
+  code --> check["3 Pre-commit checks<br/>make lint · typecheck · test · red-team"]
+  check -->|fail| code
+  check -->|all green| pr["Open a PR<br/>why / what changed / how tested"]
+  pr --> ci{"CI: backend + frontend"}
+  ci -->|fail| code
+  ci -->|pass| merge["Merge"]
 ```
 
-## 1. 准备本地环境
+## 1. Local setup
 
 ```bash
-# 装 uv —— https://docs.astral.sh/uv/
-uv sync                          # 后端 + MCP servers
-cd apps/web && npm install && cd -   # 前端
+# Install uv — https://docs.astral.sh/uv/
+uv sync                          # Backend + MCP servers
+cd apps/web && npm install && cd -   # Frontend
 
-# 起 Postgres + pgvector
+# Start Postgres + pgvector
 cp .env.example .env
 docker compose up -d postgres
 make seed
 ```
 
-要求：
+Requirements:
 
-- Python 3.12+（推荐 uv）
+- Python 3.12+ (uv recommended)
 - Node.js 22+
-- Docker / Docker Compose（Postgres + pgvector）
+- Docker / Docker Compose (Postgres + pgvector)
 
-## 2. 启动 dev
+## 2. Start dev
 
 ```bash
 make dev
-# 后端 http://localhost:8000  （Swagger 在 /docs）
-# 前端 http://localhost:3000
+# Backend http://localhost:8000  (Swagger at /docs)
+# Frontend http://localhost:3000
 ```
 
-## 3. 提交前自检（与 CI 一致）
+## 3. Pre-commit checks (same as CI)
 
 ```bash
 make lint        # ruff + eslint
 make typecheck   # mypy + tsc
 make test        # pytest + next lint
-make red-team    # 对抗 prompt 烟测（baseline profile，期望 0 PII 泄漏）
+make red-team    # Adversarial-prompt smoke (baseline profile; expect 0 PII leaks)
 ```
 
-> 完整 200 条对抗集用 `uv run python scripts/eval_adversarial.py` 跑。
+> Run the full 200-prompt adversarial set with `uv run python scripts/eval_adversarial.py`.
 
-提交前跑一次 `make fmt` 自动修复 Python / 前端格式。新增 Python 包记得加进 `[tool.uv.workspace] members`。
+Run `make fmt` once before committing to auto-fix Python / frontend formatting. Add new Python packages to `[tool.uv.workspace] members`.
 
-## 4. 文档约定
+## 4. Documentation conventions
 
-- **重要技术决策**写到对应的 [`docs/milestone-*-plan.md`](.) 方案文档，或新建 `DECISIONS.md`（ADR 风格）。
-- **阶段性进展**更新 [`docs/roadmap.md`](docs/roadmap.md)。
-- **新增 MCP server**：在 [`packages/mcp-servers/<name>/README.md`](packages/mcp-servers/) 里写清 tool surface 与 capability 等级（read / write / destructive）。
+- **Material technical decisions** go in the matching [`docs/milestone-*-plan.md`](.) plan, or a new `DECISIONS.md` (ADR style).
+- **Milestone progress** updates [`docs/roadmap.md`](docs/roadmap.md).
+- **New MCP servers**: document the tool surface and capability level (read / write / destructive) in [`packages/mcp-servers/<name>/README.md`](packages/mcp-servers/).
 
-## 5. Commit 信息
+## 5. Commit messages
 
-- 用英文简短说明，遵循 conventional commits（`feat:` / `fix:` / `docs:` / `refactor:` / `chore:` / `test:`）。
-- 一个 commit 只做一件事；跨子模块改动尽量拆开。
-- PR 描述里说明：**为什么改 / 改了什么 / 怎么测**，新增对抗样本时贴上 red-team 通过率。
+- Short English summaries, conventional commits (`feat:` / `fix:` / `docs:` / `refactor:` / `chore:` / `test:`).
+- One commit, one change; split cross-package edits when you can.
+- In the PR description: **why / what changed / how you tested**. When adding adversarial samples, include the red-team pass rate.
 
-## 6. CI 必须通过
+## 6. CI must pass
 
-每个 PR 会跑两个 job，都要绿：
+Every PR runs two jobs; both must be green:
 
-- `backend`（uv / ruff / pytest）
-- `frontend`（Next.js lint + build；`next build` 内含 tsc 类型检查）
+- `backend` (uv / ruff / `mypy apps/api/src packages` / pytest)
+- `frontend` (Next.js lint + build; `next build` includes tsc)
 
-> 本地 `make typecheck` 还会额外跑后端 `mypy`。目前 mypy 尚未全绿（见 roadmap 的类型加固里程碑），
-> 因此暂未纳入 CI 门禁；提交前建议本地跑一遍。
+> Local `make typecheck` matches CI: backend `mypy` on `apps/api/src` and `packages`, plus frontend `tsc`.
 
-如果改动会影响 red-team 通过率，请在 PR 描述里贴前后对比。
+If your change affects the red-team pass rate, include a before/after comparison in the PR.
 
-## 7. 较大的提案
+## 7. Larger proposals
 
-新增 Agent、修改 handoff 协议、切换 LLM provider、或改动租户隔离机制 ——
-**先开 issue 讨论方向**，避免投入大改后才发现冲突。
+New agents, handoff-protocol changes, switching LLM provider, or tenant-isolation changes —
+**open an issue to align on direction first**, so a large investment does not collide with existing work.
 
-—— 感谢贡献！
+— Thank you for contributing!

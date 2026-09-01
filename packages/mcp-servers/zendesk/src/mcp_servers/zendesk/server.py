@@ -1,6 +1,6 @@
 """Zendesk Mock MCP Server (real impl using the official `mcp` Python SDK).
 
-工具：
+Tools:
 - get_ticket_history(customer_id) → list[Ticket]            (capability=read)
 - update_ticket(ticket_id, status?, note?) → Ticket         (capability=write)
 - escalate(ticket_id, reason) → Ticket                      (capability=destructive)

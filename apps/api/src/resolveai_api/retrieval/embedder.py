@@ -1,11 +1,12 @@
-"""Embedding factory — 调库优先，直接复用 LangChain 现成 Embeddings 客户端。
+"""Embedding factory that reuses established LangChain embedding clients.
 
-与 [`core/llm.py`](../core/llm.py) 的 cost-aware routing 同构：
-- backend="ollama" → `OllamaEmbeddings`（默认 `bge-m3`，1024 维，本地无外呼）
+This mirrors the cost-aware routing in [`core/llm.py`](../core/llm.py):
+- backend="ollama" → `OllamaEmbeddings` (default `bge-m3`, 1,024 dimensions,
+  with no external calls)
 - backend="openai" → `OpenAIEmbeddings`
 
-不自建推理服务；维度强校验放在 seed / query 调用方，确保与
-`kb_documents.embedding vector(1024)` 一致。
+No custom inference service is introduced. Seed and query callers strictly
+validate dimensions against `kb_documents.embedding vector(1024)`.
 """
 
 from __future__ import annotations

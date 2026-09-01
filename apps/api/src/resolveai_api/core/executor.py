@@ -1,15 +1,17 @@
 """Executor — invoke LangChain tools (MCP-backed) with capability enforcement.
 
-每次工具调用都过：
-  1. capability whitelist 检查（决策 4 · Layer 2，three tiers — M3 收紧）
-     - read 工具默认放行（即使不在白名单）— 业务 Agent 通常需要读
-     - write 工具必须显式 grant（agent 的 TOOL_WHITELIST）
-     - destructive 工具必须显式 grant，并标 `audit=True` 供 Layer 3 cross-check
-  2. sandbox scope metadata（决策 4 · Layer 2）
-  3. 调用 LangChain BaseTool（由 mcp/loader.py 适配出来）
+Every tool call passes through:
+  1. A capability-whitelist check (Decision 4 · Layer 2, tightened to three
+     tiers in M3)
+     - read tools are allowed by default, even when absent from the whitelist
+     - write tools require an explicit grant in the agent's TOOL_WHITELIST
+     - destructive tools require an explicit grant and set `audit=True` for
+       Layer 3 cross-checking
+  2. Sandbox scope metadata (Decision 4 · Layer 2)
+  3. Invocation of the LangChain BaseTool adapted by mcp/loader.py
 
-行业对齐：capability-based access control 与 OpenAI tool calling / Anthropic
-computer-use / Bedrock Agents 的「最小权限 + 显式 grant」一致。
+This capability-based access control follows the least-privilege and explicit-
+grant model used by OpenAI tool calling, Anthropic computer use, and Bedrock Agents.
 """
 
 from __future__ import annotations

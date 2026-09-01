@@ -1,10 +1,13 @@
-"""bge-reranker-v2-m3 精排层 — 调库优先，复用 sentence-transformers CrossEncoder。
+"""bge-reranker-v2-m3 reranking layer using sentence-transformers CrossEncoder.
 
-设计要点（与 plan 的"调库优先 + 可降级"一致）：
-- 重依赖（torch / sentence-transformers）lazy import，仅首次 rerank 时加载。
-- 任意失败（未安装、模型拉取失败、推理异常）→ 回退到入参顺序（即 RRF 排序），
-  保持接口契约不变。这样 `pip install` 不带 reranker extra 也能跑 dense/hybrid。
-- CrossEncoder.predict 是 CPU 密集的同步调用，丢到线程池避免阻塞事件循环。
+Design principles:
+- Lazily import heavy dependencies (torch and sentence-transformers) on the
+  first reranking request.
+- On any failure (missing package, model download, or inference), fall back to
+  input order (the RRF order) without changing the interface contract. This
+  keeps dense and hybrid retrieval usable without the reranker extra.
+- Run the synchronous, CPU-intensive CrossEncoder.predict in a thread pool to
+  avoid blocking the event loop.
 """
 
 from __future__ import annotations

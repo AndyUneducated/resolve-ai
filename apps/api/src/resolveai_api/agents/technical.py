@@ -1,12 +1,15 @@
 """Technical Agent — KB-grounded answers via hybrid retrieval (M6).
 
-M6 范围：接入 [`retrieval.HybridRetriever`](../retrieval/hybrid.py) 的 BM25 + dense
-+ RRF + reranker，先检索内部 KB / FAQ / runbook，再用 LLM 生成**带 doc id 引用**的
-回复。仍保留 M3 的 Zendesk 历史拉取作为补充 context。
+M6 scope: integrate BM25, dense retrieval, RRF, and reranking from
+[`retrieval.HybridRetriever`](../retrieval/hybrid.py). Search the internal KB,
+FAQ, and runbooks first, then use the LLM to generate a response with document
+ID citations. The M3 Zendesk history lookup remains as supplementary context.
 
-Grounding 契约（供 M7/M8 评测 + M5 安全归因复用）：
-- 回复引用的 doc id 必须 ⊆ 当次检索结果集；越界的视为幻觉并被剔除 + 打标。
-- 召回 chunk 先过 `retrieval_filter.scan_chunks`（间接注入 / KB 投毒），命中即隔离。
+Grounding contract (shared by M7/M8 evaluation and M5 security attribution):
+- Cited document IDs must be a subset of the current retrieval results;
+  out-of-set IDs are treated as hallucinations, removed, and flagged.
+- Retrieved chunks pass through `retrieval_filter.scan_chunks` for indirect
+  injection and KB poisoning; matches are quarantined.
 """
 
 from __future__ import annotations

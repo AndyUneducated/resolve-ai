@@ -1,9 +1,11 @@
-"""Reciprocal Rank Fusion (RRF) — 纯函数，无 DB / 无外部依赖，便于单测。
+"""Reciprocal Rank Fusion (RRF), implemented as an easily tested pure function.
 
-行业标准做法（Cormack et al. 2009）：对每一路检索结果按名次累加 1/(k+rank)，
-名次从 1 起。k 越大，越淡化排名差异；默认 60。
+The standard approach (Cormack et al., 2009) sums 1/(k+rank) across retrieval
+paths, with ranks starting at 1. Larger k values reduce rank differences; the
+default is 60.
 
-只做"算法本体"的薄实现——没有可直接复用的轻量库值得为 ~10 行 RRF 引入。
+This is a thin implementation of the algorithm itself; no reusable lightweight
+library warrants an added dependency for approximately ten lines of RRF.
 """
 
 from __future__ import annotations

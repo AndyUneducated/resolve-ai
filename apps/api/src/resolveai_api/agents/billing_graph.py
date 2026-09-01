@@ -1,14 +1,17 @@
 """Billing sub-graph — Plan-Execute-Replan loop.
 
-行业对齐：完全照 LangGraph 官方 blog *Planning Agents (2024)* 的三节点闭环：
+Industry-aligned design: follow the three-node loop from LangGraph's official
+*Planning Agents (2024)* blog:
 
     planner ─► executor ─► replanner ─► (executor | END)
 
-State：在 `GraphState` 之外加 `plan: list[str]` / `past_steps: list[(step, observation)]`
-和 `response: str`。`response` 非空即终止。`MAX_STEPS` 防止 LLM 死循环。
+State extends `GraphState` with `plan: list[str]`,
+`past_steps: list[(step, observation)]`, and `response: str`. A non-empty
+`response` terminates the loop, while `MAX_STEPS` prevents infinite LLM loops.
 
-工具集 = 已经按 Agent capability whitelist 过滤过的 LangChain `BaseTool`。
-工具调用通过 [`core/executor.py`](../core/executor.py) 的 capability gate。
+The tool set consists of LangChain `BaseTool` instances already filtered by the
+agent capability whitelist. Calls pass through the capability gate in
+[`core/executor.py`](../core/executor.py).
 """
 
 from __future__ import annotations

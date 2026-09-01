@@ -1,10 +1,12 @@
 """MCP loader — adapt MCP servers to LangChain `BaseTool` via the official adapter.
 
-行业对齐（2026）：用 `langchain-mcp-adapters` 的 `MultiServerMCPClient` 自动把
-每个 MCP server 暴露的工具转换成 LangChain `BaseTool`，不再自己手写 schema bridge。
+Industry-aligned approach (2026): use `langchain-mcp-adapters`
+`MultiServerMCPClient` to convert each MCP server's exposed tools into
+LangChain `BaseTool` instances instead of maintaining a custom schema bridge.
 
-每个 tool 上 `metadata["server"]` 与 `metadata["capability"]` 由本模块打标，
-[`core/executor.py`](../core/executor.py) 据此强制 capability whitelist（决策 4 · Layer 2）。
+This module stamps `metadata["server"]` and `metadata["capability"]` on every
+tool. [`core/executor.py`](../core/executor.py) uses them to enforce the
+capability whitelist (Decision 4 · Layer 2).
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from resolveai_api.mcp.registry import McpServerSpec, default_servers
 if TYPE_CHECKING:
     pass
 
-# capability 元数据来自每个 mock server 的 TOOLS 列表
+# Capability metadata comes from each mock server's TOOLS list.
 _CAPABILITY_REGISTRY: dict[str, dict[str, str]] = {}
 
 

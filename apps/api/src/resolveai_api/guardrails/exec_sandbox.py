@@ -1,13 +1,15 @@
-"""Layer 2 · 执行侧 — gVisor per-call 沙箱 + capability 白名单。
+"""Layer 2 · Execution side — per-call gVisor sandbox and capability whitelist.
 
-关键 trade-off（设计文档原文）：
-  gVisor 本身**不防 injection**，它防的是 **injection 成功之后的 blast radius**。
-  这两件事经常被混。
+Key trade-off from the design document:
+  gVisor does not prevent injection; it limits the blast radius after a
+  successful injection. These concerns are often conflated.
 
-M10：`ExecutionSandbox` 现在解析**有效后端**（none / subprocess / container）并按
-capability 计算 `SandboxPolicy`；对 write / destructive 工具，若所选后端无法覆盖
-某些隔离维度（subprocess 无法隔离 fs / network），记 `sandbox:degraded:<dims>` 到
-`scope.violations`（供审计 / 观测）。`SANDBOX_MODE=off`（默认）时行为与之前一致。
+M10: `ExecutionSandbox` resolves the effective backend (none, subprocess, or
+container) and computes `SandboxPolicy` by capability. For write and
+destructive tools, if the selected backend cannot cover an isolation dimension
+(subprocess cannot isolate the filesystem or network), it records
+`sandbox:degraded:<dims>` in `scope.violations` for auditing and observability.
+Behavior remains unchanged when `SANDBOX_MODE=off`, the default.
 """
 
 from __future__ import annotations

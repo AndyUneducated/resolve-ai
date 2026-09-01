@@ -19,13 +19,17 @@ def get_supervisor(request: Request) -> SupervisorGraph:
 def get_tenant_id(request: Request) -> str:
     """Resolve the tenant id for the current request.
 
-    本项目不做也不计划做鉴权（见 docs/milestone-9-plan.md §4），所以这里是个 thin
-    dependency：从请求上下文取 tenant_id，缺省回退 `DEFAULT_TENANT_ID`。它把租户身份
-    喂给下游 `SET LOCAL app.tenant_id`，让 RLS 成为「防应用 bug」的 defense-in-depth，
-    而非假装拦住恶意客户端（无 auth 时客户端仍可自报 tenant）。
+    This project does not implement or plan to implement authentication (see
+    docs/milestone-9-plan.md section 4), so this is a thin dependency: it reads
+    tenant_id from the request context and falls back to `DEFAULT_TENANT_ID`.
+    It passes tenant identity downstream to `SET LOCAL app.tenant_id`, making
+    RLS defense in depth against application bugs rather than pretending to
+    block malicious clients (without authentication, clients can still supply
+    their own tenant).
 
-    取值优先级：`X-Tenant-Id` header > `tenant` query 参数 > `DEFAULT_TENANT_ID`。
-    请求体里的 `ChatRequest.tenant_id`（已有全链路）仍由 endpoint 自行透传，二者一致。
+    Resolution order: `X-Tenant-Id` header > `tenant` query parameter >
+    `DEFAULT_TENANT_ID`. The endpoint still forwards `ChatRequest.tenant_id`
+    from the request body through the existing end-to-end path.
     """
     header_tenant = request.headers.get("x-tenant-id")
     query_tenant = request.query_params.get("tenant")

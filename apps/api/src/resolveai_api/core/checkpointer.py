@@ -1,9 +1,11 @@
 """Async LangGraph checkpointer factory.
 
-行业对齐：用 `AsyncPostgresSaver`（与 FastAPI 异步栈一致）做 dev/prod state
-持久化；测试场景下用 `MemorySaver`（LangGraph 官方测试 fixture）。
+Industry-aligned approach: use `AsyncPostgresSaver`, matching FastAPI's async
+stack, for development and production state persistence; use `MemorySaver`,
+LangGraph's official test fixture, in tests.
 
-Checkpoint thread_id 由调用方按 `tenant::customer::thread` 命名（决策 4 · Layer 4）。
+Callers name checkpoint thread IDs as `tenant::customer::thread`
+(Decision 4 · Layer 4).
 """
 
 from __future__ import annotations

@@ -1,13 +1,15 @@
-"""Hybrid 检索编排层 — BM25 (Postgres ts_rank_cd) + dense (pgvector) + RRF + rerank。
+"""Hybrid retrieval orchestration: BM25, dense retrieval, RRF, and reranking.
 
-本模块只做"编排"：把 embedder / store / fusion / reranker 这些薄封装拼起来，
-底层检索与打分全部交给 Postgres、pgvector、sentence-transformers。
+This module only orchestrates thin wrappers for the embedder, store, fusion,
+and reranker. Postgres, pgvector, and sentence-transformers perform the
+underlying retrieval and scoring.
 
-可配置 profile：
-- "hybrid"     双路召回 → RRF 融合 → reranker 精排（M6 目标）
-- "dense_only" 仅向量召回 → reranker 精排（roadmap 的可砍降级路径 / M7 ablation）
+Configurable profiles:
+- "hybrid": dual-path retrieval → RRF fusion → reranking (M6 target)
+- "dense_only": vector retrieval → reranking (roadmap fallback / M7 ablation)
 
-统一接口供 Technical KB 与未来长期 memory 复用；查询强制带 tenant_id。
+The unified interface is shared by the Technical KB and future long-term
+memory; every query requires a tenant_id.
 """
 
 from __future__ import annotations
@@ -57,7 +59,7 @@ def _annotate_span(otel_span: object, trace: RetrievalTrace) -> None:
 
 
 class HybridRetriever:
-    """编排 BM25 + dense + RRF + reranker。组件可注入，便于测试与 memory 复用。"""
+    """Orchestrate BM25, dense retrieval, RRF, and reranking with injectable components."""
 
     def __init__(
         self,
@@ -111,7 +113,7 @@ class HybridRetriever:
         k: int = 10,
         rrf_k: int | None = None,
     ) -> list[RetrievedDoc]:
-        """检索 top-k：每路取候选 → RRF 融合 → reranker 精排回 top-k。"""
+        """Retrieve top-k via per-path candidates, RRF fusion, and reranking."""
         docs, _ = await self.search_with_trace(
             query=query, tenant_id=tenant_id, k=k, rrf_k=rrf_k
         )
@@ -125,7 +127,7 @@ class HybridRetriever:
         k: int = 10,
         rrf_k: int | None = None,
     ) -> tuple[list[RetrievedDoc], RetrievalTrace]:
-        """同 `search`，但额外返回 `RetrievalTrace`（doc ids / 各路 / latency）。"""
+        """Like `search`, but also return a `RetrievalTrace` with IDs, paths, and latency."""
         rrf_k = rrf_k or self._rrf_k
         trace = RetrievalTrace(query=query, tenant_id=tenant_id, profile=self._profile)
         start = time.perf_counter()

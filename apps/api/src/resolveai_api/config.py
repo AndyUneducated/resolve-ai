@@ -1,4 +1,4 @@
-"""集中配置 — 单一来源，pydantic-settings 从环境变量 / .env 读取。"""
+"""Centralized configuration: a single source read from environment variables and .env."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
 
-    # 决策 1 · Cost-aware Routing（本地验证默认双 9B；生产可设 VERTICAL_MODEL=qwen3.6:27b）
+    # Decision 1 · Cost-aware routing (two 9B defaults for local validation;
+    # production may set VERTICAL_MODEL=qwen3.6:27b).
     triage_model: str = Field(default="qwen3.5:9b", alias="TRIAGE_MODEL")
     vertical_model: str = Field(default="qwen3.5:9b", alias="VERTICAL_MODEL")
 
@@ -39,14 +40,17 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://resolveai:resolveai@localhost:5432/resolveai",
         alias="DATABASE_URL",
     )
-    """管理员 DSN（resolveai，超级用户）：迁移 / seed / 扩展 / LangGraph checkpoint setup。"""
+    """Administrator DSN (resolveai superuser) for migrations, seeds, extensions, and LangGraph checkpoint setup."""
 
     app_database_url: str = Field(default="", alias="APP_DATABASE_URL")
-    """应用运行时 DSN（M9）：tenant-scoped SQLAlchemy 查询（KbStore）以此连库。
+    """Application runtime DSN (M9) used by tenant-scoped SQLAlchemy queries.
 
-    应指向低权限角色 `resolveai_app`（NOSUPERUSER/NOBYPASSRLS），RLS 才会真正生效——
-    超级用户 / BYPASSRLS 角色无条件绕过 RLS，FORCE 也拦不住。留空则回退 `database_url`
-    （仅适用于未应用 0001_rls.sql 迁移、或刻意不启用硬隔离的环境）。"""
+    This should target the low-privilege `resolveai_app` role
+    (NOSUPERUSER/NOBYPASSRLS) so RLS is effective. Superuser and BYPASSRLS
+    roles bypass RLS unconditionally, even with FORCE. When empty, this falls
+    back to `database_url`, which is appropriate only when the 0001_rls.sql
+    migration is not applied or hard isolation is intentionally disabled.
+    """
 
     @property
     def app_dsn(self) -> str:
@@ -138,40 +142,43 @@ class Settings(BaseSettings):
     guardrail_fail_closed: str = Field(default="auto", alias="GUARDRAIL_FAIL_CLOSED")
 
     # ---------- Retrieval (M6 · Hybrid Retrieval) ----------
-    # 调库优先：embedding 走 langchain-ollama / langchain-openai 现成 Embeddings；
-    # 向量检索走 pgvector；BM25 走 Postgres ts_rank_cd；精排走 sentence-transformers。
+    # Prefer established libraries: embeddings use langchain-ollama or
+    # langchain-openai, vector retrieval uses pgvector, BM25 uses Postgres
+    # ts_rank_cd, and reranking uses sentence-transformers.
     embedding_backend: str = Field(default="ollama", alias="EMBEDDING_BACKEND")
-    """ollama (default) | openai — embedding 客户端后端。"""
+    """ollama (default) | openai — embedding client backend."""
     embedding_model: str = Field(default="bge-m3", alias="EMBEDDING_MODEL")
-    """默认 bge-m3 → 1024 维，与 kb_documents.embedding vector(1024) 对齐。"""
+    """Defaults to bge-m3 with 1,024 dimensions, matching kb_documents.embedding vector(1024)."""
     embedding_dim: int = Field(default=1024, alias="EMBEDDING_DIM")
-    """强校验维度，seed 与 query 两端必须一致。"""
+    """Strictly validated dimension; seed and query dimensions must match."""
 
     retrieval_profile: str = Field(default="hybrid", alias="RETRIEVAL_PROFILE")
-    """hybrid (BM25 + dense + RRF) | dense_only (降级路径，用于 M7 ablation)。"""
+    """hybrid (BM25 + dense + RRF) | dense_only (fallback path for M7 ablation)."""
     retrieval_top_k: int = Field(default=5, alias="RETRIEVAL_TOP_K")
-    """最终返回给 Agent 的文档数（reranker 之后）。"""
+    """Number of documents ultimately returned to the agent after reranking."""
     retrieval_candidate_k: int = Field(default=50, alias="RETRIEVAL_CANDIDATE_K")
-    """每路召回的候选数（送入 RRF 融合）。"""
+    """Number of candidates retrieved per path and passed to RRF fusion."""
     retrieval_rrf_k: int = Field(default=60, alias="RETRIEVAL_RRF_K")
-    """RRF 常数 k；越大越平滑，行业默认 60。"""
+    """RRF constant k; larger values smooth rank differences. The standard default is 60."""
 
     reranker_enabled: str = Field(default="on", alias="RERANKER_ENABLED")
-    """on | off — 关掉则回退 RRF 融合排序（reranker 依赖未装时自动降级）。"""
+    """on | off — when off, fall back to RRF fusion order; missing reranker dependencies also trigger this fallback."""
     reranker_model: str = Field(
         default="BAAI/bge-reranker-v2-m3", alias="RERANKER_MODEL"
     )
 
     # ---------- Semantic cache (M13) ----------
     semantic_cache_enabled: str = Field(default="off", alias="SEMANTIC_CACHE_ENABLED")
-    """on | off（默认）— on 时对 KB 检索做 embedding 近邻语义缓存（降 DB 往返 +
-    rerank 计算）。默认 off，检索路径与 M13 前逐字节一致。"""
+    """on | off (default) — when on, use an embedding-neighbor semantic cache
+    for KB retrieval to reduce database round trips and reranking work. With
+    the default off setting, retrieval remains byte-for-byte identical to the
+    pre-M13 path."""
     semantic_cache_threshold: float = Field(default=0.95, alias="SEMANTIC_CACHE_THRESHOLD")
-    """余弦相似度阈值；≥ 该值判定语义命中（越高越保守，越不易串答案）。"""
+    """Cosine-similarity threshold for a semantic hit; higher values are more conservative."""
     semantic_cache_ttl_s: float = Field(default=3600.0, alias="SEMANTIC_CACHE_TTL_S")
-    """缓存条目 TTL（秒），过期即失效防陈旧。<=0 表示不过期。"""
+    """Cache-entry TTL in seconds; expired entries are invalidated. <=0 means no expiration."""
     semantic_cache_max_entries: int = Field(default=512, alias="SEMANTIC_CACHE_MAX_ENTRIES")
-    """每进程缓存容量上限；超出按最旧淘汰（LRU-ish）。"""
+    """Per-process cache capacity; evicts the oldest entries when exceeded (LRU-like)."""
 
     # ---------- Observability ----------
     otel_endpoint: str = Field(
@@ -201,9 +208,10 @@ class Settings(BaseSettings):
 
     # ---------- Multi-tenant isolation (M9 · Postgres RLS) ----------
     rls_enabled: str = Field(default="on", alias="RLS_ENABLED")
-    """on (default) | off — on 时 tenant-scoped 查询走 `tenant_session`（事务内
-    `SET LOCAL app.tenant_id`）以激活数据库 RLS policy；off 时退回纯 app 层
-    `WHERE tenant_id` 过滤（用于未应用 0001_rls.sql 迁移的环境）。"""
+    """on (default) | off — when on, tenant-scoped queries use `tenant_session`
+    with transaction-local `SET LOCAL app.tenant_id` to activate the database
+    RLS policy. When off, fall back to application-level `WHERE tenant_id`
+    filtering for environments without the 0001_rls.sql migration."""
 
     @property
     def cors_origins_list(self) -> list[str]:

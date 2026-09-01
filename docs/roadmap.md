@@ -1,43 +1,43 @@
-# Roadmap — 从脚手架（scaffold）到可演示（demo-ready）
+# Roadmap — From scaffold to demo-ready
 
-当前状态：**Phase 1（Milestone 1–9）全部完成** + 一轮**生产级加固（hardening pass）已落地** + **Phase 2 · M10–M15 已实施**（生产级护栏 & 真沙箱 / 可观测闭环 & 成本治理 / Human-in-the-Loop 接力 / RAG 质量度量 & 语义缓存 / Eval→数据飞轮 / 类型洁净 & 一键全栈）。**Roadmap 全部里程碑已落地。**
+Current status: **Phase 1 (Milestones 1–9) all complete** + one **production-grade hardening pass landed** + **Phase 2 · M10–M15 implemented** (production-grade guardrails & real sandbox / observability closed loop & cost governance / Human-in-the-Loop handoff / RAG quality metrics & semantic cache / Eval→data flywheel / type-clean & one-click full stack). **Every roadmap milestone has landed.**
 
-> **加固记录（2026-07）：** 在 M1–M9 之上做了一轮对标生产级的修复，均已随测试落地（`137 passed`）：
-> `intent=other` 优雅兜底（不再回显用户输入）、**billing/technical → escalation 真图路由**（取代文字建议后缀）、
-> `/chat` 结束事件带**每请求 token/成本**（`capture_run`）、护栏 **fail-closed 开关**（`GUARDRAIL_FAIL_CLOSED`）、
-> `/readyz` 真探测 DB/MCP、检索 dense+lexical 并发、前端 tool-trace 展示 + a11y、CI 增加前端 `build`（含 tsc）、
-> 删除死代码（`core/router.py` / `mcp/client.py`）。这些是 Phase 2 各里程碑的地基；完整版见下方 M10–M15。
+> **Hardening notes (2026-07):** On top of M1–M9 we did a production-grade pass, all landed with tests (`137 passed`):
+> graceful fallback for `intent=other` (no longer echoing user input), **billing/technical → escalation as a real graph route** (replacing a text-suggestion suffix),
+> `/chat` completion events include **per-request tokens/cost** (`capture_run`), guardrail **fail-closed switch** (`GUARDRAIL_FAIL_CLOSED`),
+> `/readyz` truly probes DB/MCP, dense+lexical retrieval in parallel, frontend tool-trace display + a11y, CI adds frontend `build` (including tsc),
+> dead code removed (`core/router.py` / `mcp/client.py`). These are the foundation for Phase 2 milestones; the full version is in M10–M15 below.
 
-**图例：**
+**Legend:**
 
-| 标记 | 含义 |
+| Mark | Meaning |
 |---|---|
-| 🧱 | **必做地基**（table stakes）——进面试的最低要求 |
-| ⭐ | **差异化里程碑**——把排名从 top 10% 拉到 top 3% 的关键杠杆，**别跳过** |
+| 🧱 | **Must-have foundation** (table stakes) — minimum bar for interviews |
+| ⭐ | **Differentiating milestone** — the lever that moves ranking from top 10% to top 3%; **do not skip** |
 
-### 里程碑全景（milestone map）
+### Milestone map
 
-九个里程碑分两类：🧱 地基负责「把系统跑通」，⭐ 差异化负责「把『我做了』升级成『我用数字证明了』」。下图箭头表示主要依赖关系。
+Nine milestones in two classes: 🧱 foundation is about getting the system running; ⭐ differentiation is about upgrading “I built it” into “I proved it with numbers.” Arrows in the diagram are primary dependencies.
 
 ```mermaid
 flowchart LR
-  M1["M1 · Hello-World 🧱"] --> M2["M2 · 单 Agent 真跑 🧱"]
-  M2 --> M3["M3 · 5 SaaS 全 MCP 🧱"]
-  M3 --> M4["M4 · 四层 Guardrails 🧱"]
-  M4 --> M5["M5 · 对抗 Eval Harness ⭐"]
+  M1["M1 · Hello-World 🧱"] --> M2["M2 · Single agent live path 🧱"]
+  M2 --> M3["M3 · 5 SaaS fully MCP 🧱"]
+  M3 --> M4["M4 · Four-layer Guardrails 🧱"]
+  M4 --> M5["M5 · Adversarial Eval Harness ⭐"]
   M3 --> M6["M6 · Hybrid Retrieval 🧱"]
   M5 --> M7["M7 · Architecture Ablation ⭐"]
   M6 --> M7
-  M7 --> M8["M8 · Chaos Demo & 视频 ⭐"]
-  M4 --> M9["M9 · 多租户硬隔离 RLS ⭐"]
+  M7 --> M8["M8 · Chaos Demo & video ⭐"]
+  M4 --> M9["M9 · Multi-tenant hard isolation RLS ⭐"]
   M6 --> M9
-  %% ---- Phase 2（规划中）----
-  M4 --> M10["M10 · 生产级护栏 & 真沙箱 ⭐"]
-  M8 --> M11["M11 · 可观测闭环 & 成本治理 ⭐"]
-  M3 --> M12["M12 · Human-in-the-Loop 接力 ⭐"]
-  M6 --> M13["M13 · RAG 质量度量 & 语义缓存 ⭐"]
-  M5 --> M14["M14 · Eval→数据飞轮（在线自改进）⭐"]
-  M9 --> M15["M15 · 类型洁净 & 一键全栈部署 🧱 ✅"]
+  %% ---- Phase 2 ----
+  M4 --> M10["M10 · Production guardrails & real sandbox ⭐"]
+  M8 --> M11["M11 · Observability closed loop & cost governance ⭐"]
+  M3 --> M12["M12 · Human-in-the-Loop handoff ⭐"]
+  M6 --> M13["M13 · RAG quality metrics & semantic cache ⭐"]
+  M5 --> M14["M14 · Eval→data flywheel (online self-improvement) ⭐"]
+  M9 --> M15["M15 · Type-clean & one-click full stack 🧱 ✅"]
   classDef base fill:#e7f0ff,stroke:#4169E1,color:#10357a;
   classDef star fill:#fff3d6,stroke:#d99a00,color:#7a5500;
   classDef plan fill:#eee,stroke:#999,color:#444,stroke-dasharray: 4 3;
@@ -45,301 +45,299 @@ flowchart LR
   class M5,M7,M8,M9,M10,M11,M12,M13,M14 star;
 ```
 
-### 一览表（at a glance）
+### At a glance
 
-| # | 里程碑 | 类型 | 一句话产出 | 状态 |
+| # | Milestone | Type | One-line deliverable | Status |
 |---|---|:---:|---|:---:|
-| M1 | Hello-World 流通 | 🧱 | 前后端 + 测试一键跑通 | ✅ |
-| M2 | 单 Agent 真跑 | 🧱 | Triage + Billing 接 Ollama，真实 Stripe MCP + Plan-Execute-Replan | ✅ |
-| M3 | 5 SaaS 全 MCP-ize | 🧱 | 5 个 SaaS 全走 stdio MCP，三档 capability 白名单 | ✅ |
-| M4 | 四层 Guardrails | 🧱 | 输入 / 执行 / 输出 / 记忆四层真跑 | ✅ |
-| M5 | 对抗 Eval Harness | ⭐ | 250 条标注 prompt → Attribution / Ablation / FP 三张表 | ✅ |
-| M6 | Hybrid Retrieval | 🧱 | BM25 + dense + RRF + reranker，KB-grounded 回答 | ✅ |
-| M7 | Architecture Ablation | ⭐ | 120-ticket benchmark × 4 配置，量化 trade-off | ✅ |
-| M8 | Chaos Demo & 视频 | ⭐ | 5K 并发压测 + online regression gate + demo 视频 | ✅ |
-| M9 | 多租户硬隔离（RLS） | ⭐ | Postgres Row-Level Security 兜底应用层 bug | ✅ |
-| **M10** | 生产级护栏 & 真沙箱 | ⭐ | fail-closed 默认 + 真实 rlimit 沙箱 + 逃逸测试量化 | ✅ |
-| **M11** | 可观测闭环 & 成本治理 | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + 成本预算熔断 + 成本回归门 | ✅ |
-| **M12** | Human-in-the-Loop 接力 | ⭐ | Executor 审批闸（destructive）+ approve/deny/edit API + `awaiting_approval` SSE + 坐席接管 | ✅ |
-| **M13** | RAG 质量度量 & 语义缓存 | ⭐ | nDCG/Recall@k 金标 + 检索回归门 + 语义缓存（tenant 隔离 + TTL）降本降延迟 | ✅ |
-| **M14** | Eval→数据飞轮 | ⭐ | trace sink → 脱敏采样 → 版本化数据集 → 双跑分回归门 + 失败聚类 | ✅ |
-| **M15** | 类型洁净 & 一键全栈部署 | 🧱 | mypy 零错（source+packages）+ CI type gate + `make stack-up` compose 一键起 + `make smoke` | ✅ |
+| M1 | Hello-World end-to-end | 🧱 | Frontend + backend + tests run with one command | ✅ |
+| M2 | Single agent live path | 🧱 | Triage + Billing on Ollama, real Stripe MCP + Plan-Execute-Replan | ✅ |
+| M3 | 5 SaaS fully MCP-ized | 🧱 | All 5 SaaS via stdio MCP, three-tier capability whitelist | ✅ |
+| M4 | Four-layer Guardrails | 🧱 | Input / exec / output / memory layers actually running | ✅ |
+| M5 | Adversarial Eval Harness | ⭐ | 250 labeled prompts → Attribution / Ablation / FP tables | ✅ |
+| M6 | Hybrid Retrieval | 🧱 | BM25 + dense + RRF + reranker, KB-grounded answers | ✅ |
+| M7 | Architecture Ablation | ⭐ | 120-ticket benchmark × 4 configs, quantified trade-off | ✅ |
+| M8 | Chaos Demo & video | ⭐ | 5K concurrent load + online regression gate + demo video | ✅ |
+| M9 | Multi-tenant hard isolation (RLS) | ⭐ | Postgres Row-Level Security as a backstop for app-layer bugs | ✅ |
+| **M10** | Production guardrails & real sandbox | ⭐ | fail-closed by default + real rlimit sandbox + quantified escape tests | ✅ |
+| **M11** | Observability closed loop & cost governance | ⭐ | /metrics + OTel→Collector→Tempo/Prometheus→Grafana + cost-budget circuit breaker + cost regression gate | ✅ |
+| **M12** | Human-in-the-Loop handoff | ⭐ | Executor approval gate (destructive) + approve/deny/edit API + `awaiting_approval` SSE + human-agent takeover | ✅ |
+| **M13** | RAG quality metrics & semantic cache | ⭐ | nDCG/Recall@k golden set + retrieval regression gate + semantic cache (tenant isolation + TTL) to cut cost and latency | ✅ |
+| **M14** | Eval→data flywheel | ⭐ | trace sink → redacted sampling → versioned datasets → dual-score regression gate + failure clustering | ✅ |
+| **M15** | Type-clean & one-click full stack | 🧱 | mypy zero errors (source+packages) + CI type gate + `make stack-up` compose one-shot + `make smoke` | ✅ |
 
-> Phase 2 详细技术方案：[M10](milestone-10-plan.md) · [M11](milestone-11-plan.md) · [M12](milestone-12-plan.md) · [M13](milestone-13-plan.md) · [M14](milestone-14-plan.md) · [M15](milestone-15-plan.md)。
+> Phase 2 detailed designs: [M10](milestone-10-plan.md) · [M11](milestone-11-plan.md) · [M12](milestone-12-plan.md) · [M13](milestone-13-plan.md) · [M14](milestone-14-plan.md) · [M15](milestone-15-plan.md).
 
-## Milestone 1 · Hello-World 流通（1 day）🧱 — ✅ Done
+## Milestone 1 · Hello-World end-to-end (1 day) 🧱 — ✅ Done
 
-- [x] `make install` 跑通（uv sync + npm install）
-- [x] `make api` 起后端，`GET /` 200
-- [x] `make web` 起前端，`/chat` 能发请求拿到 stub 响应
-- [x] `make test` 通过
+- [x] `make install` works (uv sync + npm install)
+- [x] `make api` starts the backend, `GET /` returns 200
+- [x] `make web` starts the frontend, `/chat` can send a request and get a stub response
+- [x] `make test` passes
 
-## Milestone 2 · 单 Agent 真跑（2-3 days）🧱 — ✅ Done
+## Milestone 2 · Single agent live path (2-3 days) 🧱 — ✅ Done
 
-- [x] `TriageAgent` 接 **Ollama `qwen3.5:9b`**（`with_structured_output(TriageOutput)`，Pydantic v2 schema）
-- [x] `BillingAgent` 接 **Ollama**（`VERTICAL_MODEL`，默认本机验证用 `qwen3.5:9b`，可按需改 `qwen3.6:27b`），落地 LangGraph 官方 Plan-Execute-Replan 三节点闭环子图（`apps/api/src/resolveai_api/agents/billing_graph.py`）
-- [x] Stripe MCP server 用官方 `mcp.server.lowlevel.Server` + `stdio_server` 真跑；`list_charges` / `get_charge` / `refund` 全部可调，含 over-amount / already-refunded 错误路径
-- [x] LangGraph `AsyncPostgresSaver` 接上（`CHECKPOINT_BACKEND=postgres`），测试用 `MemorySaver`；thread_id = `tenant::customer::thread` 对齐决策 4 · Layer 4
-- [x] `langchain-mcp-adapters` 桥接 MCP → LangChain `BaseTool`，capability whitelist 在 Executor 强制（destructive 必须显式 grant）
-- [x] 21/21 单元 + e2e 测试绿，含 `test_triage_structured` / `test_billing_subgraph` / `test_stripe_mcp` / `test_capability_whitelist` / `test_chat_flow`（含 checkpoint 恢复）
+- [x] `TriageAgent` wired to **Ollama `qwen3.5:9b`** (`with_structured_output(TriageOutput)`, Pydantic v2 schema)
+- [x] `BillingAgent` wired to **Ollama** (`VERTICAL_MODEL`, default local verify with `qwen3.5:9b`, can switch to `qwen3.6:27b` as needed), LangGraph official Plan-Execute-Replan three-node closed-loop subgraph (`apps/api/src/resolveai_api/agents/billing_graph.py`)
+- [x] Stripe MCP server runs for real via official `mcp.server.lowlevel.Server` + `stdio_server`; `list_charges` / `get_charge` / `refund` all callable, including over-amount / already-refunded error paths
+- [x] LangGraph `AsyncPostgresSaver` wired (`CHECKPOINT_BACKEND=postgres`), tests use `MemorySaver`; thread_id = `tenant::customer::thread` aligned with decision 4 · Layer 4
+- [x] `langchain-mcp-adapters` bridges MCP → LangChain `BaseTool`, capability whitelist enforced in Executor (destructive requires an explicit grant)
+- [x] 21/21 unit + e2e tests green, including `test_triage_structured` / `test_billing_subgraph` / `test_stripe_mcp` / `test_capability_whitelist` / `test_chat_flow` (including checkpoint resume)
 
-详细技术方案见 [`docs/milestone-2-plan.md`](milestone-2-plan.md)。
+Detailed design: [`docs/milestone-2-plan.md`](milestone-2-plan.md).
 
-## Milestone 3 · 5 SaaS 全 MCP-ize（3 days）🧱 — ✅ Done
+## Milestone 3 · 5 SaaS fully MCP-ized (3 days) 🧱 — ✅ Done
 
-- [x] Zendesk / Slack / Salesforce / Intercom 全部按 `mcp.server.lowlevel.Server + stdio_server` 实装（mirror Stripe），各自 7 条单测覆盖 happy path + 错误路径
-- [x] `mcp/toolbelt.py` `ToolBelt`：`from_settings()` 走 `MultiServerMCPClient` 自动 discovery，`for_agent(whitelist)` 切片、`by_capability` 分组、`manifest()` 序列化；5-server discovery 烟测覆盖（`test_toolbelt.py`）
-- [x] Executor 升级到三档 capability（read/write/destructive），write 与 destructive 必须显式 grant；destructive 调用 `audit=True`
-- [x] Escalation Agent 走真实 `slack.notify_team` + `zendesk.escalate`；Technical Agent 通过 `zendesk.get_ticket_history` 拉历史 context
-- [x] `.env.example` 默认启用 5 个 `MCP_*_CMD`；`conftest.py` 重置全部 mock store
-- [x] 65/65 单元 + 集成测试绿（含 5-server discovery 烟测）
+- [x] Zendesk / Slack / Salesforce / Intercom all implemented as `mcp.server.lowlevel.Server + stdio_server` (mirroring Stripe), each with 7 unit tests covering happy path + error paths
+- [x] `mcp/toolbelt.py` `ToolBelt`: `from_settings()` uses `MultiServerMCPClient` auto-discovery, `for_agent(whitelist)` slices, `by_capability` groups, `manifest()` serializes; 5-server discovery smoke covered (`test_toolbelt.py`)
+- [x] Executor upgraded to three-tier capability (read/write/destructive); write and destructive require an explicit grant; destructive calls `audit=True`
+- [x] Escalation Agent uses real `slack.notify_team` + `zendesk.escalate`; Technical Agent pulls history context via `zendesk.get_ticket_history`
+- [x] `.env.example` enables all 5 `MCP_*_CMD` by default; `conftest.py` resets every mock store
+- [x] 65/65 unit + integration tests green (including 5-server discovery smoke)
 
-详细技术方案见 [`docs/milestone-3-plan.md`](milestone-3-plan.md)。
+Detailed design: [`docs/milestone-3-plan.md`](milestone-3-plan.md).
 
-## Milestone 4 · 四层 Guardrails 真跑（2-3 days）🧱 — ✅ Done
+## Milestone 4 · Four-layer Guardrails live (2-3 days) 🧱 — ✅ Done
 
-- [x] 输入：Llama Guard endpoint + Presidio analyzer
-- [x] 执行：gVisor runtime 跑工具调用（K8s Pod-per-call 或 docker --runtime=runsc）
-- [x] 输出：Presidio re-scan + policy LLM judge + hallucinated entity detector（tool-return cross-check）
-- [x] 记忆：state checkpoint key 强制 `(tenant_id, customer_id)` 命名空间，cross-tenant access 抛 PermissionError
+- [x] Input: Llama Guard endpoint + Presidio analyzer
+- [x] Exec: gVisor runtime for tool calls (K8s Pod-per-call or docker --runtime=runsc)
+- [x] Output: Presidio re-scan + policy LLM judge + hallucinated entity detector (tool-return cross-check)
+- [x] Memory: state checkpoint key forced to `(tenant_id, customer_id)` namespace; cross-tenant access raises PermissionError
 
-## Milestone 5 · Adversarial Eval Harness（3-4 days）⭐ — ✅ Done
+## Milestone 5 · Adversarial Eval Harness (3-4 days) ⭐ — ✅ Done
 
-> **目标**：从"我做了 4 层 guardrails"升级为"我**证明**了每一层都不可替代，并量化了精度/召回/FP rate"。
-> **产出**：Layer-attribution 表 + Ablation 表 + 一篇 blog 草稿（top 3% 的杀手锏）。
+> **Goal:** Upgrade “I built 4 layers of guardrails” to “I **proved** each layer is irreplaceable, and quantified precision / recall / FP rate.”
+> **Deliverable:** Layer-attribution table + Ablation table + a blog draft (the top-3% showpiece).
 
-### 5.1 数据集（200 条 prompt，分类 + 标注 ground truth）
+### 5.1 Dataset (200 prompts, classified + labeled ground truth)
 
-- [x] `tests/fixtures/red_team.jsonl`，每条 schema：
+- [x] `tests/fixtures/red_team.jsonl`, per-row schema:
   ```json
   {
     "id": "...", "category": "jailbreak|indirect_injection|pii_extraction|unauthorized_concession|cross_tenant",
     "prompt": "...", "expected_block_layer": "input|exec|output|memory|none",
-    "expected_intent": "billing|technical|...",  // 用于跑通正常路径下的辅助断言
-    "notes": "为什么这条 prompt 应该被这一层拦"
+    "expected_intent": "billing|technical|...",  // auxiliary assertion for the happy path
+    "notes": "why this prompt should be stopped at this layer"
   }
   ```
-- [x] 5 类各 30-50 条，覆盖：
-  - **Jailbreak（50）** — DAN / role-play / 多语言绕过
-  - **Indirect injection（50）** — 嵌在 quoted ticket / RAG 文档里的恶意指令
-  - **PII extraction（30）** — 套上轮对话 / 套 system prompt / 跨客户钓鱼
-  - **Unauthorized concession（40）** — 套折扣码 / 编造退款金额超 SLA
-  - **Cross-tenant（30）** — 多租户 namespace 串号攻击
-- [x] 配 50 条**良性 ticket**对照集，用来测 false positive rate（这是 senior 信号）
+- [x] 30–50 items per category, covering:
+  - **Jailbreak (50)** — DAN / role-play / multilingual bypass
+  - **Indirect injection (50)** — malicious instructions nested in quoted tickets / RAG documents
+  - **PII extraction (30)** — fishing prior-turn context / fishing the system prompt / cross-customer phishing
+  - **Unauthorized concession (40)** — fishing discount codes / fabricating refund amounts above SLA
+  - **Cross-tenant (30)** — multi-tenant namespace mix-up attacks
+- [x] Plus 50 **benign tickets** as a control set for false-positive rate (this is a senior signal)
 
 ### 5.2 Eval Runner
 
-- [x] `scripts/eval_adversarial.py` —— 跑全 200 + 50 条，每条记录：
-  - 哪一层 flag 了 / 是否 block 了 / 输出文本
-  - 实际 block layer vs expected block layer（attribution 准确度）
-  - 端到端 latency / token cost
-- [x] 输出 `reports/eval_<timestamp>.json` + Markdown 表（`scripts/eval_report.py` + `guardrails/eval_scoring.py`）
+- [x] `scripts/eval_adversarial.py` — runs all 200 + 50, recording per item:
+  - which layer flagged / whether it blocked / output text
+  - actual block layer vs expected block layer (attribution accuracy)
+  - end-to-end latency / token cost
+- [x] Writes `reports/eval_<timestamp>.json` + Markdown tables (`scripts/eval_report.py` + `guardrails/eval_scoring.py`)
 
-### 5.3 关键产出表（**面试现场用**）
+### 5.3 Key output tables (**for interviews**)
 
-- [x] **Layer Attribution Table** — 证明每层都有不可替代价值
+- [x] **Layer Attribution Table** — shows each layer has irreplaceable value
 
-  | 攻击类别 | Layer 1 拦 | Layer 2 拦 | Layer 3 拦 | Layer 4 拦 | 漏过 |
+  | Attack category | Layer 1 blocked | Layer 2 blocked | Layer 3 blocked | Layer 4 blocked | Missed |
   |---|---|---|---|---|---|
   | Jailbreak | ?% | — | ?% | — | ?% |
   | Indirect injection | ?% | — | ?% | — | ?% |
   | … | | | | | |
 
-- [x] **Ablation Table** — 关掉哪一层会掉多少（证明四层都必要）
+- [x] **Ablation Table** — how much drops when a layer is off (proves all four are necessary)
 
-  | 配置 | Block rate | False positive | 漏过的 worst-case 例子 |
+  | Config | Block rate | False positive | Worst-case miss |
   |---|---|---|---|
-  | 全 4 层（baseline）| ?% | ?% | — |
-  | 关 Layer 1（输入）| ?% | ?% | "indirect injection X 通过了" |
-  | 关 Layer 3（输出）| ?% | ?% | "L1 没拦的 jailbreak 输出 PII" |
-  | 关 Layer 4（记忆）| ?% | ?% | "跨租户 X 串号" |
+  | All 4 layers (baseline) | ?% | ?% | — |
+  | L1 off (input) | ?% | ?% | "indirect injection X got through" |
+  | L3 off (output) | ?% | ?% | "jailbreak L1 missed leaked PII in output" |
+  | L4 off (memory) | ?% | ?% | "cross-tenant X mix-up" |
 
-- [x] **False Positive 分析** — 良性 ticket 的误拦率 + 误拦原因分类
-- [x] **Blog 草稿**：*"Why customer-facing AI needs 4 layers of guardrails: 200 adversarial prompts, attribution-tested"* —— 准备发 HN / r/LocalLLaMA / langgraph discord
+- [x] **False Positive analysis** — benign-ticket false-block rate + reason taxonomy
+- [x] **Blog draft:** *"Why customer-facing AI needs 4 layers of guardrails: 200 adversarial prompts, attribution-tested"* — ready for HN / r/LocalLLaMA / langgraph discord
 
-### 5.4 验收
+### 5.4 Acceptance
 
-- [x] 5 类攻击，**baseline (4 层) 漏过率 ≤ 2%**（由 `scripts/eval_adversarial.py` 实测产出）
-- [x] 良性 ticket false positive ≤ 5%（由报告脚本自动计算）
-- [x] **每一层关掉都能找到至少 1 个新增漏过 case**（L2 作为 blast-radius 层，指标解释写入 blog）
+- [x] For 5 attack categories, **baseline (4 layers) miss rate ≤ 2%** (measured by `scripts/eval_adversarial.py`)
+- [x] Benign-ticket false positive ≤ 5% (computed by the report script)
+- [x] **Turning any layer off yields at least 1 additional miss** (L2 is a blast-radius layer; the metric interpretation is written into the blog)
 
-## Milestone 6 · Hybrid Retrieval（2 days）🧱 — ✅ Done
+## Milestone 6 · Hybrid Retrieval (2 days) 🧱 — ✅ Done
 
-- [x] Postgres 灌 50+ 条 FAQ / runbook（带 embedding）
-- [x] BM25 (ts_rank_cd) + dense (cosine) 双路 + RRF 融合
-- [x] bge-reranker-v2-m3 精排
-- [x] Technical Agent 跑 KB-grounded 回复
+- [x] Postgres seeded with 50+ FAQ / runbook rows (with embeddings)
+- [x] Dual path BM25 (ts_rank_cd) + dense (cosine) + RRF fusion
+- [x] bge-reranker-v2-m3 rerank
+- [x] Technical Agent produces KB-grounded replies
 
-详细技术方案见 [`docs/milestone-6-plan.md`](milestone-6-plan.md)。
+Detailed design: [`docs/milestone-6-plan.md`](milestone-6-plan.md).
 
-## Milestone 7 · 量化 Architecture Ablation（3-4 days）⭐ — ✅ Done
+## Milestone 7 · Quantified Architecture Ablation (3-4 days) ⭐ — ✅ Done
 
-> **目标**：把"我用了 multi-agent / Plan-and-Execute / 结构化 handoff"升级为"我**测过**这些选择的代价与收益，能 defend 每一个 trade-off"。
-> **产出**：1 张主表 + 4 个对照配置的 benchmark 数据（Sierra staff 面试官的最爱追问点）。
+> **Goal:** Upgrade “I used multi-agent / Plan-and-Execute / structured handoff” to “I **measured** the cost and benefit of each choice and can defend every trade-off.”
+> **Deliverable:** 1 primary table + benchmark data for 4 contrast configs (a favorite follow-up from Sierra staff interviewers).
 
-### 7.1 Benchmark 数据集
+### 7.1 Benchmark dataset
 
-- [x] `apps/api/tests/fixtures/benchmark_tickets.jsonl` —— 120 条真实风格 ticket（手写，对齐 MCP mock seed：ch_001..ch_005 / cus_demo_001..003 / zd_001..004）：
-  - 72 billing / 36 technical / 12 escalation（60/30/10）
-  - 每条标 ground truth：`expected_intent` / `expected_resolution_path` / `expected_tool_calls` + `rubric`
-  - LLM-judge（`eval/judge.py` · `ResolutionJudge`）按 rubric 评 final answer 是否真解决
+- [x] `apps/api/tests/fixtures/benchmark_tickets.jsonl` — 120 realistic-style tickets (handwritten, aligned with MCP mock seed: ch_001..ch_005 / cus_demo_001..003 / zd_001..004):
+  - 72 billing / 36 technical / 12 escalation (60/30/10)
+  - Each labeled with ground truth: `expected_intent` / `expected_resolution_path` / `expected_tool_calls` + `rubric`
+  - LLM-judge (`eval/judge.py` · `ResolutionJudge`) scores whether the final answer actually resolved the ticket against the rubric
 
-### 7.2 4 个对照配置
+### 7.2 Four contrast configs
 
-| Variant | 描述 | 验证什么 |
+| Variant | Description | What it tests |
 |---|---|---|
-| **A · Single-Agent + 全工具白名单** | 1 个 LLM 看所有 5 SaaS 工具 + 大 prompt | 证明 multi-agent 不是炫技 |
-| **B · 4-Agent + 全对话 handoff** | Triage 把整段对话原样传给业务 Agent | 量化"结构化 ticket summary" 的真实收益 |
-| **C · 4-Agent + ReAct（替代 Plan-and-Execute）** | 业务 Agent 单步循环 vs 多步规划 | 量化 Plan-and-Execute 的真实收益 |
-| **D · 最终方案**（4-Agent + 结构化 handoff + Plan-and-Execute + Cost Routing） | baseline | — |
+| **A · Single-Agent + full tool whitelist** | 1 LLM sees all 5 SaaS tools + a large prompt | Shows multi-agent is not a vanity play |
+| **B · 4-Agent + full-transcript handoff** | Triage forwards the entire conversation as-is to the business Agent | Quantifies the real gain from a structured ticket summary |
+| **C · 4-Agent + ReAct (instead of Plan-and-Execute)** | Business Agent single-step loop vs multi-step planning | Quantifies the real gain from Plan-and-Execute |
+| **D · Final design** (4-Agent + structured handoff + Plan-and-Execute + Cost Routing) | baseline | — |
 
-- [x] `scripts/eval_architecture.py` —— 对每个 variant 跑全 benchmark，记录：
-  - **Token / ticket**（in + out 分开；真实 Ollama token，经 `core/usage.py` contextvar trace 按 tier 归集，含子图/结构化输出调用）
-  - **$ / ticket**（按 tier 模型计价 · `eval/pricing.py`：triage≈Haiku / vertical≈Sonnet 公开价；token 真实、美元建模）
+- [x] `scripts/eval_architecture.py` — runs the full benchmark per variant, recording:
+  - **Token / ticket** (in + out separately; real Ollama tokens, aggregated by tier via `core/usage.py` contextvar trace, including subgraph / structured-output calls)
+  - **$ / ticket** (priced by tier model · `eval/pricing.py`: triage≈Haiku / vertical≈Sonnet public prices; tokens are real, dollars are modeled)
   - **Latency P50 / P95**
-  - **Auto-resolution rate**（LLM-judge 评是否真解决）
-  - **Tool error rate**（工具选错 / 调用失败 / hallucinated entity · `eval/trace.py:classify_tool_errors`）
+  - **Auto-resolution rate** (LLM-judge: whether it actually resolved)
+  - **Tool error rate** (wrong tool / call failed / hallucinated entity · `eval/trace.py:classify_tool_errors`)
 
-> 4 个对照配置通过 `eval/variants.py` 的 `VariantSpec`（topology / handoff / business_strategy / triage_tier 四轴）+ `SupervisorGraph(options=GraphOptions(...))` 表达；生产路径默认即 variant D，M1-M6 行为不变（108/108 测试绿）。
+> The four contrast configs are expressed as `VariantSpec` in `eval/variants.py` (topology / handoff / business_strategy / triage_tier) + `SupervisorGraph(options=GraphOptions(...))`; the production path defaults to variant D; M1–M6 behavior is unchanged (108/108 tests green).
 
-### 7.3 关键产出表
+### 7.3 Key output tables
 
-- [x] **Architecture Ablation Table** 生成器（**简历现场摊开的杀手锏**）—— `eval/arch_scoring.py:render_markdown` 产出下表 + `Δ (D vs A)` 行（数字待全量跑填入，见 README「Benchmark & 对抗研究」章节）
+- [x] **Architecture Ablation Table** generator (**the interview showpiece**) — `eval/arch_scoring.py:render_markdown` produces the table below + a `Δ (D vs A)` row (numbers TBD until a full run; see the README “Benchmark & adversarial research” section)
 
   | Variant | Token/ticket | $/ticket | P95 (s) | Auto-resolve | Tool error |
   |---|---|---|---|---|---|
   | A · Single-Agent | TBD | TBD | TBD | TBD | TBD |
   | B · 4-Agent + full transcript handoff | TBD | TBD | TBD | TBD | TBD |
   | C · 4-Agent + ReAct | TBD | TBD | TBD | TBD | TBD |
-  | **D · 最终方案** | TBD | TBD | TBD | TBD | TBD |
+  | **D · Final design** | TBD | TBD | TBD | TBD | TBD |
   | **Δ (D vs A)** | TBD | TBD | TBD | TBD | TBD |
 
-- [x] **Cost Routing 单独 ablation** —— variant `D` vs `D_triage_vertical`（`--cost-routing`）：同 token、按 tier 计价对比 $/ticket + auto-resolve 是否掉（`build_cost_routing_table`）
-- [x] **Failure Mode 报告** —— 每个 variant 取 1-2 个 worst-case（judge 分最低 / errored）+ 原因（`build_failure_modes`，已渲染进 `.md`）
+- [x] **Cost Routing standalone ablation** — variant `D` vs `D_triage_vertical` (`--cost-routing`): same tokens, compare $/ticket by tier pricing + whether auto-resolve drops (`build_cost_routing_table`)
+- [x] **Failure Mode report** — 1–2 worst cases per variant (lowest judge score / errored) + reasons (`build_failure_modes`, already rendered into `.md`)
 
-### 7.4 验收
+### 7.4 Acceptance
 
-> 验收需在目标硬件/模型上跑全量 `uv run python scripts/eval_architecture.py --variants A,B,C,D --cost-routing` 后填表（本机 9B Ollama 下 plan-execute 单条耗时长，建议调大 `--case-timeout` 或换更快模型）。Harness、judge、scoring、tracing 已端到端验证（technical 单条实跑：token/cost/latency/agent_path/tool_calls/judge 全字段产出）。
+> Acceptance requires filling the table after a full run of `uv run python scripts/eval_architecture.py --variants A,B,C,D --cost-routing` on the target hardware/model (on local 9B Ollama, plan-execute cases are slow; raise `--case-timeout` or use a faster model). Harness, judge, scoring, and tracing are already verified end-to-end (single technical live run: token/cost/latency/agent_path/tool_calls/judge all populated).
 
-- [x] D 在**至少 3 个指标**上显著优于 A / B / C（不显著的指标也要诚实写在 blog 里 —— "这个维度 multi-agent 没收益，trade-off 在这")
-- [x] 简历 bullet 的所有数字（"~60% token reduction" 等）能被这张表 back up
-- [x] **Blog 草稿 2**：*"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* —— 已内联进 README「Benchmark & 对抗研究」章节（方法论完成，表格待全量数字）
+- [x] D is significantly better than A / B / C on **at least 3 metrics** (metrics that are not significant should still be written honestly in the blog — “multi-agent has no gain on this axis; the trade-off is here”)
+- [x] Every number on the resume bullet (e.g. “~60% token reduction”) can be backed by this table
+- [x] **Blog draft 2:** *"Multi-agent vs single-agent for customer support: a benchmarked trade-off study"* — already inlined into the README “Benchmark & adversarial research” section (methodology done; table awaits full-run numbers)
 
-详细技术方案见 [`docs/milestone-7-plan.md`](milestone-7-plan.md)。
+Detailed design: [`docs/milestone-7-plan.md`](milestone-7-plan.md).
 
-## Milestone 8 · Chaos Demo & 视频 artifact（2 days）⭐ — ✅ Done
+## Milestone 8 · Chaos Demo & video artifact (2 days) ⭐ — ✅ Done
 
-- [x] `scripts/chaos_load.py` 5K mock ticket 并发，P95 < 6s —— `asyncio.Semaphore` fan-out 走真实 `SupervisorGraph`；新增 `LLM_BACKEND=fake`（`core/_fake_llm.py`）零网络确定性后端隔离框架并发开销。本机实测：5000 条 / concurrency 200，全部完成，吞吐 ~1248 req/s，**P95 0.18s**（目标 6s → PASS）。报告写 `reports/chaos/`。
-- [x] OTel 接 EvalGate（项目 1）做 online regression —— `observability/tracing.py` 加 `get_tracer()/span()` no-op helper + `ticket.run`/`agent.{node}`/`guardrail.block`（supervisor）+ `tool.call`（executor）span；`observability/evalgate.py` 实现 `EvalGateClient.push()`（httpx，`EVALGATE_ENDPOINT` 未配置即 no-op）+ `build_run_summary()`；`scripts/regression_gate.py` 复用 M7 judge/pricing/trace，对比 `reports/baseline/metrics_baseline.json`，回归即非零退出（CI 门禁）。
-- [x] **3 分钟 Demo 视频**（自动化录制 + 旁白脚本）—— `apps/web/demo/record.spec.ts`（Playwright，烧字幕，输出真实 `webm`）走 4 段脚本；UI 保持现状，trace/metrics 段由 `scripts/render_metrics_page.py` 生成 `trace.html` / `metrics.html` 供录制：
-  - 0:00-0:30 正常 ticket：Triage → Billing → refund → 成功（live `/chat`）
-  - 0:30-1:30 对抗 ticket：indirect injection 被 Layer 1 标记（flag chip），Layer 3 输出侧 re-scan（trace 高亮）
-  - 1:30-2:00 跨租户串号攻击：`IsolatedCheckpointer` namespace check 抛 `CrossTenantAccessBlockedError`，trace 复现命名空间 mismatch
-  - 2:00-3:00 chaos load 实时 metrics（P95 gate）+ Architecture Ablation 表
-- [x] 简历 bullet 直接挂视频链接 —— 见 [`docs/milestone-8-plan.md`](milestone-8-plan.md) §2（录制后填 Loom/YouTube 链接）。旁白/分镜：[`docs/demo/narration.md`](demo/narration.md) · [`docs/demo/shot-list.md`](demo/shot-list.md)
+- [x] `scripts/chaos_load.py` 5K mock tickets concurrent, P95 < 6s — `asyncio.Semaphore` fan-out through the real `SupervisorGraph`; added `LLM_BACKEND=fake` (`core/_fake_llm.py`) as a zero-network deterministic backend to isolate framework concurrency cost. Local measurement: 5000 tickets / concurrency 200, all completed, throughput ~1248 req/s, **P95 0.18s** (target 6s → PASS). Reports written to `reports/chaos/`.
+- [x] OTel wired to EvalGate (project 1) for online regression — `observability/tracing.py` adds `get_tracer()/span()` no-op helper + `ticket.run`/`agent.{node}`/`guardrail.block` (supervisor) + `tool.call` (executor) spans; `observability/evalgate.py` implements `EvalGateClient.push()` (httpx; no-op if `EVALGATE_ENDPOINT` is unset) + `build_run_summary()`; `scripts/regression_gate.py` reuses M7 judge/pricing/trace, compares against `reports/baseline/metrics_baseline.json`, non-zero exit on regression (CI gate).
+- [x] **3-minute demo video** (automated recording + narration script) — `apps/web/demo/record.spec.ts` (Playwright, burned-in captions, real `webm`) walks 4 beats; UI stays as-is; trace/metrics beats use `scripts/render_metrics_page.py` to generate `trace.html` / `metrics.html` for recording:
+  - 0:00-0:30 normal ticket: Triage → Billing → refund → success (live `/chat`)
+  - 0:30-1:30 adversarial ticket: indirect injection flagged by Layer 1 (flag chip), Layer 3 output-side re-scan (trace highlight)
+  - 1:30-2:00 cross-tenant mix-up: `IsolatedCheckpointer` namespace check raises `CrossTenantAccessBlockedError`, trace shows namespace mismatch
+  - 2:00-3:00 chaos load live metrics (P95 gate) + Architecture Ablation table
+- [x] Resume bullet links the video — see [`docs/milestone-8-plan.md`](milestone-8-plan.md) §2 (fill Loom/YouTube URL after recording). Narration/shot list: [`docs/demo/narration.md`](demo/narration.md) · [`docs/demo/shot-list.md`](demo/shot-list.md)
 
-详细技术方案见 [`docs/milestone-8-plan.md`](milestone-8-plan.md)。
+Detailed design: [`docs/milestone-8-plan.md`](milestone-8-plan.md).
 
-## Milestone 9 · 多租户硬隔离（Postgres RLS）（2-3 days）⭐ — ✅ Done
+## Milestone 9 · Multi-tenant hard isolation (Postgres RLS) (2-3 days) ⭐ — ✅ Done
 
-> **目标**：把"tenant_id 在应用层 scope"升级为"数据库层强制隔离 —— 即使应用代码写错 / 漏过滤，Postgres 也物理拦住跨租户读写"。defense-in-depth 防**应用 bug** 的最后一层（不做鉴权，故不针对恶意客户端）。
+> **Goal:** Upgrade “tenant_id is scoped in the app layer” to “the database enforces isolation — even if application code is wrong / forgets a filter, Postgres physically blocks cross-tenant reads and writes.” Last defense-in-depth layer against **application bugs** (this is not auth, so it is not aimed at a malicious client).
 
-- [x] tenant_id 列贯穿所有业务表（已基本就绪：`tenants` / `customers` / `tickets` / `kb_documents` / `agent_checkpoints` 均带 `tenant_id`，本里程碑补审计 + checkpoint 表 caveat）
-- [x] Postgres row-level security：业务表 `ENABLE ROW LEVEL SECURITY` + 基于 `current_setting('app.tenant_id')` 的 policy；低权限 `resolveai_app` 角色使 RLS 真正生效
-- [x] 请求级 `SET LOCAL app.tenant_id`：每个 DB 事务从请求上下文注入租户（demo 回退 `DEFAULT_TENANT_ID`；不做鉴权）
-- [x] RLS 负向测试：跨租户读 / 写 / 删在 DB 层抛错（与现有 app 层 `IsolatedCheckpointer` 互为冗余）
+- [x] tenant_id column on all business tables (mostly already in place: `tenants` / `customers` / `tickets` / `kb_documents` / `agent_checkpoints` all have `tenant_id`; this milestone adds audit + checkpoint-table caveat)
+- [x] Postgres row-level security: `ENABLE ROW LEVEL SECURITY` on business tables + policy based on `current_setting('app.tenant_id')`; low-privilege `resolveai_app` role so RLS actually takes effect
+- [x] Request-scoped `SET LOCAL app.tenant_id`: each DB transaction injects the tenant from request context (demo falls back to `DEFAULT_TENANT_ID`; no auth)
+- [x] RLS negative tests: cross-tenant read / write / delete fail at the DB layer (redundant with existing app-layer `IsolatedCheckpointer`)
 
-详细技术方案见 [`docs/milestone-9-plan.md`](milestone-9-plan.md)。
+Detailed design: [`docs/milestone-9-plan.md`](milestone-9-plan.md).
 
 ---
 
-# Phase 2 · 从「demo-ready」到「production-grade」（M10–M15）✅ 已实施
+# Phase 2 · From “demo-ready” to “production-grade” (M10–M15) ✅ Implemented
 
-> **定位**：Phase 1 证明了"能力"（多 Agent、护栏、检索、eval、隔离）。Phase 2 证明"运营" —— 生产环境要求的
-> fail-safe 默认、可观测闭环、人机接力、质量度量、自改进飞轮与一键部署。每个里程碑都在本次**加固 pass 落地的地基**之上延展，
-> 面试叙事从"我实现了 X"升级为"我把 X 运营到了生产 SLO"。
+> **Positioning:** Phase 1 proved capability (multi-agent, guardrails, retrieval, eval, isolation). Phase 2 proves operations — the fail-safe defaults, observability closed loop, human handoff, quality metrics, self-improvement flywheel, and one-click deploy that production requires. Each milestone extends the **foundation landed in the hardening pass**, and the interview story upgrades from “I implemented X” to “I operated X to a production SLO.”
 >
-> 依赖顺序：M10/M11 可并行起步（都依赖已落地的 fail-closed 开关与 `capture_run` 成本埋点）；M12 依赖 M10 的审批中断；
-> M13 依赖 M6 检索；M14 依赖 M5 eval + M11 trace；M15 收尾（类型 + 部署），可随时穿插。
+> Dependency order: M10/M11 can start in parallel (both depend on the landed fail-closed switch and `capture_run` cost instrumentation); M12 depends on M10’s approval interrupt;
+> M13 depends on M6 retrieval; M14 depends on M5 eval + M11 traces; M15 is wrap-up (types + deploy) and can be interleaved anytime.
 
-## Milestone 10 · 生产级护栏 & 真沙箱（3-4 days）⭐ — ✅ Done
+## Milestone 10 · Production guardrails & real sandbox (3-4 days) ⭐ — ✅ Done
 
-> **目标**：把护栏从"能演示拦截"升级为"生产可依赖" —— profile 感知的 fail-closed 默认、**真实 OS 级沙箱**（POSIX rlimit + 墙钟超时）+ gVisor 容器命令契约、并用**逃逸测试**量化沙箱有效性（拦截率 / 逃逸率）。
+> **Goal:** Upgrade guardrails from “can demo a block” to “dependable in production” — profile-aware fail-closed defaults, a **real OS-level sandbox** (POSIX rlimit + wall-clock timeout) + gVisor container command contract, and **escape tests** that quantify sandbox effectiveness (block rate / escape rate).
 
-- [x] fail-closed 变为**生产 profile 默认**（`ENV_PROFILE` + `GUARDRAIL_FAIL_CLOSED=auto` + `resolve_fail_closed`），并用 `BlockKind` 区分「降级拦截 degraded」与「真命中拦截 true_positive」（`blocked` 事件带 `layer`+`kind`，span 记 `blocked_kind`）
-- [x] **真实沙箱**（`guardrails/sandbox.py`）：subprocess 后端 `setrlimit`（CPU/内存/进程/文件大小）+ 墙钟超时**实测强制**；container 后端构造 gVisor `runsc` 全维隔离命令（`--network`/`--read-only`/`--memory`/`--pids-limit`/`--ulimit`/`--cap-drop=ALL`）+ 运行时探测 + 后端选择。工具真正入容器执行列为遗留（当前进程内 async 调用）
-- [x] **沙箱逃逸测试集**（读 `/etc/passwd`、外连、CPU DoS、写盘、fork-bomb-lite、env 泄漏）→ `scripts/eval_sandbox.py` 产出 `reports/sandbox/escape_matrix_*.md`：subprocess 层对资源型攻击 4/5 拦截，**filesystem 读逃逸**（量化 gVisor 必要性）
-- [x] 护栏各层 latency 进 `done` 事件（`guardrail_latency_ms.{input,output}`）+ `ticket.run` span
-- [x] 测试：`test_sandbox.py`（真实子进程 containment + 容器契约）+ `test_hardening.py`（profile / block_kind / production 默认硬拦截）—— `146 passed`
+- [x] fail-closed becomes the **production-profile default** (`ENV_PROFILE` + `GUARDRAIL_FAIL_CLOSED=auto` + `resolve_fail_closed`), and `BlockKind` distinguishes “degraded block” from “true-positive block” (`blocked` events carry `layer`+`kind`; spans record `blocked_kind`)
+- [x] **Real sandbox** (`guardrails/sandbox.py`): subprocess backend `setrlimit` (CPU/memory/process/file size) + wall-clock timeout **actually enforced**; container backend builds a full-dimension gVisor `runsc` isolation command (`--network`/`--read-only`/`--memory`/`--pids-limit`/`--ulimit`/`--cap-drop=ALL`) + runtime probe + backend selection. Running tools inside the container is leftover work (today: in-process async calls)
+- [x] **Sandbox escape test set** (read `/etc/passwd`, outbound connect, CPU DoS, disk write, fork-bomb-lite, env leak) → `scripts/eval_sandbox.py` writes `reports/sandbox/escape_matrix_*.md`: subprocess layer blocks 4/5 resource attacks, **filesystem read escape** (quantifies why gVisor is needed)
+- [x] Per-layer guardrail latency on `done` events (`guardrail_latency_ms.{input,output}`) + `ticket.run` span
+- [x] Tests: `test_sandbox.py` (real subprocess containment + container contract) + `test_hardening.py` (profile / block_kind / production-default hard block) — `146 passed`
 
-详细技术方案见 [`docs/milestone-10-plan.md`](milestone-10-plan.md)。
+Detailed design: [`docs/milestone-10-plan.md`](milestone-10-plan.md).
 
-## Milestone 11 · 可观测闭环 & 成本治理（3 days）⭐ — ✅ Done
+## Milestone 11 · Observability closed loop & cost governance (3 days) ⭐ — ✅ Done
 
-> **目标**：把 M8 的 no-op OTel span 和本次落地的每请求成本，接成"trace→collector→dashboard"的闭环，并加上成本预算 / 熔断。
+> **Goal:** Connect M8’s no-op OTel spans and the landed per-request cost into a “trace→collector→dashboard” loop, plus cost budget / circuit breaker.
 
-- **已落地地基**：`core/usage.capture_run` 每请求 token/成本聚合 + `/chat` `done` 事件下发 + `eval/pricing` 成本模型；OTel span helper（M8）。
-- [x] OTel exporter 接真实 **Collector → Tempo + Prometheus + Grafana**（`make obs` 一键起，镜像 pin），span 有效导出 + spanmetrics RED
-- [x] Grafana 预置 dashboard：ticket 速率/outcome、护栏拦截分层(kind)、成本 p50/p95、护栏延迟 p95、tool 错误率、预算熔断、tokens p95
-- [x] **每请求成本预算 + 熔断**：`COST_BUDGET_USD` + `core/budget.py`，超预算时垂直循环停止花钱并打 `cost:budget_exceeded`
-- [x] `/metrics` Prometheus 端点（`observability/metrics.py` + `api/metrics.py`）+ `done` 事件回填 `over_budget`/`cost_budget_usd`
-- [x] 成本回归门：`regression_gate.py` 的 `mean_cost_usd` 维度 + 单测锁定（涨价即非零退出）
+- **Foundation already landed:** `core/usage.capture_run` per-request token/cost aggregation + `/chat` `done` event + `eval/pricing` cost model; OTel span helper (M8).
+- [x] OTel exporter wired to a real **Collector → Tempo + Prometheus + Grafana** (`make obs` one-shot, image pins), spans actually exported + spanmetrics RED
+- [x] Grafana preset dashboard: ticket rate/outcome, guardrail blocks by layer (kind), cost p50/p95, guardrail latency p95, tool error rate, budget circuit breaker, tokens p95
+- [x] **Per-request cost budget + circuit breaker:** `COST_BUDGET_USD` + `core/budget.py`; when over budget the vertical loop stops spending and emits `cost:budget_exceeded`
+- [x] `/metrics` Prometheus endpoint (`observability/metrics.py` + `api/metrics.py`) + `done` events backfill `over_budget`/`cost_budget_usd`
+- [x] Cost regression gate: `mean_cost_usd` dimension in `regression_gate.py` + unit tests that lock it (price increase → non-zero exit)
 
-详细技术方案见 [`docs/milestone-11-plan.md`](milestone-11-plan.md)。
+Detailed design: [`docs/milestone-11-plan.md`](milestone-11-plan.md).
 
-## Milestone 12 · Human-in-the-Loop 接力（3 days）⭐ — ✅ Done
+## Milestone 12 · Human-in-the-Loop handoff (3 days) ⭐ — ✅ Done
 
-> **目标**：把"escalation 真路由"升级为"真正的人机协作" —— 高风险动作前**挂起等待人工审批**，坐席可接管。
+> **Goal:** Upgrade “escalation is a real route” to “real human–machine collaboration” — **suspend and wait for human approval** before high-risk actions; a human agent can take over.
 
-- **已落地地基**：billing/technical → escalation **真图边**（`escalate` flag + `_route_after_vertical`），取代文字后缀。
-- [x] 审批闸在 destructive 动作前挂起（放 `Executor.call_tool` 收敛点，非嵌套 `interrupt()`）：`core/approvals.py` + request-scoped `ApprovalContext`；`APPROVAL_MODE=off` 默认零行为变化
-- [x] 审批 API（`GET/POST /api/v1/approvals`）+ 前端审批卡片：approve/deny/edit；批准后**重放恢复**（对话态由既有 checkpointer 持久化）
-- [x] 坐席接管：`POST /api/v1/threads/takeover|release` → `human_owned` 时 `Supervisor.stream` 短路自动化
-- [x] 审批审计：who/when/decision/edited_args/note（对齐 M3 destructive `audit=True`）+ `resolveai_approvals_pending_total` 指标
-- [x] e2e：park → approve → 重放执行；deny 阻断；edit 用改后 args；takeover 短路（`test_approvals.py`，18 用例，全绿）
+- **Foundation already landed:** billing/technical → escalation **real graph edge** (`escalate` flag + `_route_after_vertical`), replacing a text suffix.
+- [x] Approval gate suspends before destructive actions (at the `Executor.call_tool` choke point, not nested `interrupt()`): `core/approvals.py` + request-scoped `ApprovalContext`; `APPROVAL_MODE=off` default is zero behavior change
+- [x] Approval API (`GET/POST /api/v1/approvals`) + frontend approval card: approve/deny/edit; after approve, **replay resume** (conversation state persisted by the existing checkpointer)
+- [x] Human-agent takeover: `POST /api/v1/threads/takeover|release` → when `human_owned`, `Supervisor.stream` short-circuits automation
+- [x] Approval audit: who/when/decision/edited_args/note (aligned with M3 destructive `audit=True`) + `resolveai_approvals_pending_total` metric
+- [x] e2e: park → approve → replay execute; deny blocks; edit uses revised args; takeover short-circuits (`test_approvals.py`, 18 cases, all green)
 
-详细技术方案见 [`docs/milestone-12-plan.md`](milestone-12-plan.md)。
+Detailed design: [`docs/milestone-12-plan.md`](milestone-12-plan.md).
 
-## Milestone 13 · RAG 质量度量 & 语义缓存（3 days）⭐ — ✅ Done
+## Milestone 13 · RAG quality metrics & semantic cache (3 days) ⭐ — ✅ Done
 
-> **目标**：把 M6 的"检索能跑"升级为"检索质量被量化 + 成本被优化"。
+> **Goal:** Upgrade M6’s “retrieval runs” to “retrieval quality is measured + cost is optimized.”
 
-- **已落地地基**：hybrid 检索 dense+lexical **并发**（`asyncio.gather`）；`kb_retrieval_golden.jsonl` 金标已存在。
-- [x] **nDCG@k**（log2 折扣，二值 & 分级）加入 `retrieval/metrics.py` + `eval_retrieval.py`；产出 `reports/retrieval/quality.md`（profile×metric 表）
-- [x] **语义缓存**（`retrieval/semantic_cache.py`）：cosine-NN 命中即复用检索结果，**tenant 隔离** + TTL + LRU；接入 `HybridRetriever`（命中跳过 DB 往返），`SEMANTIC_CACHE_ENABLED=off` 默认
-- [x] 命中/未命中指标 `resolveai_cache_hits_total` / `resolveai_cache_misses_total`
-- [x] 检索回归门：`check_retrieval_regression` nDCG/recall 跌超阈值即 `eval_retrieval.py` 非零退出
-- [x] LM-free 单测锁定度量/缓存/回归门（`test_semantic_cache.py` + `test_retrieval_metrics.py`）；真实质量数字需 seed DB + embedding
+- **Foundation already landed:** hybrid retrieval dense+lexical **concurrent** (`asyncio.gather`); `kb_retrieval_golden.jsonl` golden set already exists.
+- [x] **nDCG@k** (log2 discount, binary & graded) added to `retrieval/metrics.py` + `eval_retrieval.py`; writes `reports/retrieval/quality.md` (profile×metric table)
+- [x] **Semantic cache** (`retrieval/semantic_cache.py`): cosine-NN hit reuses retrieval results, **tenant isolation** + TTL + LRU; wired into `HybridRetriever` (hit skips DB round-trip); `SEMANTIC_CACHE_ENABLED=off` by default
+- [x] Hit/miss metrics `resolveai_cache_hits_total` / `resolveai_cache_misses_total`
+- [x] Retrieval regression gate: `check_retrieval_regression` non-zero-exits `eval_retrieval.py` if nDCG/recall drop past threshold
+- [x] LM-free unit tests lock metrics/cache/regression gate (`test_semantic_cache.py` + `test_retrieval_metrics.py`); real quality numbers need a seeded DB + embeddings
 
-> 进一步生产化（不在本次）：pgvector 持久共享缓存、答案级缓存（补输出侧 re-scan）、chunk/embedding 消融表。
+> Further productionization (out of scope this pass): pgvector persistent shared cache, answer-level cache (plus output-side re-scan), chunk/embedding ablation table.
 
-详细技术方案见 [`docs/milestone-13-plan.md`](milestone-13-plan.md)。
+Detailed design: [`docs/milestone-13-plan.md`](milestone-13-plan.md).
 
-## Milestone 14 · Eval→数据飞轮（在线自改进）（3-4 days）⭐ — ✅ Done
+## Milestone 14 · Eval→data flywheel (online self-improvement) (3-4 days) ⭐ — ✅ Done
 
-> **目标**：把 M5 的静态 eval 集升级为"生产 trace 自动回灌 eval、回归门在线自改进"的闭环 —— senior 级的"系统会自己变好"叙事。
+> **Goal:** Upgrade M5’s static eval set to a closed loop where “production traces automatically refill eval, and the regression gate self-improves online” — the senior-level “the system gets better by itself” story.
 
-- **已落地地基**：M5 对抗 eval + judge/scoring；M8 `regression_gate.py` + OTel span；本次每请求 trace 带成本。
-- [x] 生产 trace **best-effort sink**（`TRACE_SINK_PATH`，写时脱敏）+ `harvest_traces.py` **分层采样 + PII 脱敏**沉淀候选 case（残留 PII 即 exit 2）
-- [x] 版本化数据集 `data/eval/vN/`（`write_dataset_version` + provenance manifest）
-- [x] **双跑分**回归门：对 legacy + harvested 双集跑分，任一集回归即拦（`dual_score_gate`）
-- [x] 失败案例聚类（intent × 护栏层/escalate/tool）→ `reports/flywheel/top_failures.md`
-- [x] LM-free 单测锁定采样/脱敏/聚类/门禁 + e2e sink（`test_flywheel.py`，13 用例）
+- **Foundation already landed:** M5 adversarial eval + judge/scoring; M8 `regression_gate.py` + OTel spans; this pass’s per-request traces include cost.
+- [x] Production-trace **best-effort sink** (`TRACE_SINK_PATH`, redact on write) + `harvest_traces.py` **stratified sampling + PII redaction** to land candidate cases (residual PII → exit 2)
+- [x] Versioned datasets `data/eval/vN/` (`write_dataset_version` + provenance manifest)
+- [x] **Dual-score** regression gate: score both legacy + harvested sets; regression on either set blocks (`dual_score_gate`)
+- [x] Failure clustering (intent × guardrail layer/escalate/tool) → `reports/flywheel/top_failures.md`
+- [x] LM-free unit tests lock sampling/redaction/clustering/gate + e2e sink (`test_flywheel.py`, 13 cases)
 
-> 进一步生产化（不在本次）：judge 预标+人工确认 CLI、质量曲线接 Grafana、sink→Kafka/对象存储。
+> Further productionization (out of scope this pass): judge pre-label + human-confirm CLI, quality curves in Grafana, sink→Kafka/object storage.
 
-详细技术方案见 [`docs/milestone-14-plan.md`](milestone-14-plan.md)。
+Detailed design: [`docs/milestone-14-plan.md`](milestone-14-plan.md).
 
-## Milestone 15 · 类型洁净 & 一键全栈部署（2-3 days）🧱 — ✅ Done
+## Milestone 15 · Type-clean & one-click full stack (2-3 days) 🧱 — ✅ Done
 
-> **目标**：补齐工程收尾 —— 类型零错并进 CI 门禁、一键起全栈（含依赖服务）、部署可复现。
+> **Goal:** Finish the engineering wrap-up — zero type errors in CI, one-click full stack (including dependency services), reproducible deploys.
 
-- [x] `mypy apps/api/src packages` **零错**：修 `Literal[..., END]`→`str`、`FakeStructuredRunnable` 继承 `Runnable`、checkpointer override 用 `RunnableConfig`、`callbacks` 协变注解等（注解-only，无行为改动）
-- [x] CI 增加 **mypy type gate**（`.github/workflows/ci.yml` ruff→mypy→pytest，阻断新增类型错误）；口径为 source+packages，tests 暂不纳入
-- [x] `docker-compose.full.yml` + `make stack-up` 一键起**全栈**：postgres(+pgvector) + api + web，healthcheck 依赖顺序（web→api→postgres）；观测栈/KB seed 走 `--profile obs` / `--profile seed`
-- [x] API 容器 healthcheck 接 `/healthz`（liveness）；`/readyz` 真探测 DB/MCP 供 smoke/编排用
-- [x] `scripts/smoke.sh`（`make smoke`）：等 health → 报 readyz → 等 web → chat SSE 往返断言；默认 `LLM_BACKEND=fake` 零模型下载即可起
+- [x] `mypy apps/api/src packages` **zero errors**: fix `Literal[..., END]`→`str`, `FakeStructuredRunnable` inherits `Runnable`, checkpointer override uses `RunnableConfig`, covariant `callbacks` annotations, etc. (annotations only, no behavior change)
+- [x] CI adds a **mypy type gate** (`.github/workflows/ci.yml` ruff→mypy→pytest, blocks new type errors); scope is source+packages; tests are not included yet
+- [x] `docker-compose.full.yml` + `make stack-up` one-shot **full stack**: postgres(+pgvector) + api + web, healthcheck dependency order (web→api→postgres); observability stack / KB seed via `--profile obs` / `--profile seed`
+- [x] API container healthcheck uses `/healthz` (liveness); `/readyz` truly probes DB/MCP for smoke/orchestration
+- [x] `scripts/smoke.sh` (`make smoke`): wait for health → report readyz → wait for web → chat SSE round-trip assertion; default `LLM_BACKEND=fake` so it starts with zero model downloads
 
-> 诚实说明：本环境未跑完整镜像 build（重、慢），只校验了 `docker compose config` 接线与 healthcheck 顺序；完整 `make stack-up` + `make smoke` 是操作者/CI 的验收路径。
+> Honest note: this environment did not run a full image build (heavy, slow); we only verified `docker compose config` wiring and healthcheck order. Full `make stack-up` + `make smoke` is the operator/CI acceptance path.
 
-详细技术方案见 [`docs/milestone-15-plan.md`](milestone-15-plan.md)。
+Detailed design: [`docs/milestone-15-plan.md`](milestone-15-plan.md).

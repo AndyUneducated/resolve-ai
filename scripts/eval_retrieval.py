@@ -1,9 +1,10 @@
-"""检索质量评测 — 在 golden set 上算 Recall@k / MRR@k，并支持 profile 对比。
+"""Retrieval quality evaluation: calculate Recall@k / MRR@k on the golden set and compare profiles.
 
-为 M7 architecture ablation 预埋：同一 runner 换 RETRIEVAL_PROFILE 即可对比
-hybrid vs dense_only 的检索命中率（与 M5 的 guardrail_profiles 评测范式一致）。
+Prepared for the M7 architecture ablation: switch RETRIEVAL_PROFILE on the same
+runner to compare retrieval hit rates for hybrid and dense_only, following the M5
+guardrail_profiles evaluation pattern.
 
-用法（需 Postgres 已 seed + embedding 可用）:
+Usage (requires seeded Postgres and available embeddings):
     uv run python scripts/seed_db.py
     uv run python scripts/eval_retrieval.py
     uv run python scripts/eval_retrieval.py --profiles hybrid,dense_only --k 5

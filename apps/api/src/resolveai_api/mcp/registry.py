@@ -1,6 +1,6 @@
-"""MCP server 注册中心 — 配置驱动的可插拔接入。
+"""MCP server registry for configuration-driven, pluggable integrations.
 
-新增 SaaS = 加一个 MCP server entry，agent 不用动代码。
+Add a SaaS integration by adding an MCP server entry without changing agent code.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from resolveai_api.config import get_settings
 @dataclass
 class McpServerSpec:
     name: str  # eg. "stripe"
-    cmd: str  # stdio 启动命令
-    transport: str = "stdio"  # 也支持 "http" 用于生产
+    cmd: str  # stdio startup command
+    transport: str = "stdio"  # "http" is also supported in production
 
 
 def default_servers() -> list[McpServerSpec]:

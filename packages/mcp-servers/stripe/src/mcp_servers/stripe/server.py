@@ -1,11 +1,12 @@
 """Stripe Mock MCP Server (real impl using the official `mcp` Python SDK).
 
-工具：
+Tools:
 - list_charges(customer_id, limit?) → list[Charge]            (capability=read)
 - get_charge(charge_id) → Charge                              (capability=read)
 - refund(charge_id, amount?) → Refund                         (capability=destructive)
 
-`refund` 必须显式出现在 Agent 的 capability whitelist 才能被调用（决策 4 · Layer 2）。
+`refund` can be called only when it is explicitly included in the agent's
+capability whitelist (Decision 4 · Layer 2).
 """
 
 from __future__ import annotations

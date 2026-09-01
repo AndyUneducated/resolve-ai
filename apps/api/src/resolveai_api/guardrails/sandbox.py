@@ -1,18 +1,22 @@
-"""Layer 2 · 真实 blast-radius 沙箱（M10）。
+"""Layer 2 · Real blast-radius sandboxing (M10).
 
-设计（诚实版）：
-- **container 层（gVisor `runsc` / `runc`）**：唯一能同时隔离**文件系统 + 网络 +
-  资源**的后端。工具打包为一次性容器：`--network`、`--read-only`、`--memory`、
-  `--pids-limit`、`--ulimit cpu/fsize`、`--cap-drop=ALL`。仅在宿主装了 docker +
-  对应 runtime 时可用。
-- **subprocess 层（POSIX rlimit + wall timeout）**：无 docker 时的兜底。能强制
-  **CPU 时间 / 内存 / 进程数 / 文件大小 / 墙钟超时**，但**无法**隔离文件系统与
-  网络 —— 这两维标记为 `degraded`，正是"要真隔离必须上 gVisor"的量化依据。
+Design:
+- **Container tier (gVisor `runsc` / `runc`)**: the only backend that isolates
+  the filesystem, network, and resources together. Each tool runs in a
+  disposable container with `--network`, `--read-only`, `--memory`,
+  `--pids-limit`, `--ulimit cpu/fsize`, and `--cap-drop=ALL`. This tier is
+  available only when Docker and the corresponding runtime are installed.
+- **Subprocess tier (POSIX rlimit + wall timeout)**: fallback when Docker is
+  unavailable. It enforces CPU time, memory, process count, file size, and
+  wall-clock timeout, but cannot isolate the filesystem or network. Those two
+  dimensions are marked `degraded`, quantifying why true isolation needs gVisor.
 
-关键 trade-off：沙箱**不防 injection**，防的是 **injection 得手后的爆炸半径**。
+Key trade-off: sandboxing does not prevent injection; it limits the blast
+radius after a successful injection.
 
-`run_sandboxed()` 是给逃逸测试 harness（`scripts/eval_sandbox.py`）跑真实探针用的；
-线上 MCP 工具是进程内 async 调用，`ExecutionSandbox` 据此选后端 + 标记降级维度。
+`run_sandboxed()` runs real probes for the escape-test harness
+(`scripts/eval_sandbox.py`). Production MCP tools are in-process async calls;
+`ExecutionSandbox` therefore selects a backend and marks degraded dimensions.
 """
 
 from __future__ import annotations
@@ -25,7 +29,8 @@ import time
 from dataclasses import dataclass
 from enum import StrEnum
 
-# 所有隔离维度。container 全覆盖；subprocess 覆盖除 network / filesystem 外的部分。
+# All isolation dimensions. Containers cover all of them; subprocesses cover
+# everything except network and filesystem isolation.
 ALL_DIMENSIONS: tuple[str, ...] = (
     "cpu",
     "memory",

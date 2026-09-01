@@ -1,11 +1,13 @@
-"""EvalGate 集成（项目 1）— 自己产品吃自己狗粮。
+"""EvalGate integration (Project 1) for internal dogfooding.
 
-通过 OTel trace + `core.usage.RunTrace` 拉到每条 ticket 的完整 Agent / Tool /
-Guardrail 时间线，构造一份精简 summary 推给 EvalGate endpoint，做 online
-regression（auto-resolution rate / P95 latency / tool-error / PII leak count）。
+Use OTel traces and `core.usage.RunTrace` to retrieve each ticket's complete
+agent, tool, and guardrail timeline. Build a concise summary and send it to the
+EvalGate endpoint for online regression of auto-resolution rate, P95 latency,
+tool errors, and PII leak count.
 
-`push()` 在 `EVALGATE_ENDPOINT` 未配置时是 no-op（与 OTel 装配一致），并且
-吞掉网络异常 —— EvalGate 不可用绝不能拖垮线上 ticket 处理。
+`push()` is a no-op when `EVALGATE_ENDPOINT` is not configured, consistent with
+the OTel setup, and suppresses network errors. EvalGate unavailability must
+never disrupt production ticket processing.
 """
 
 from __future__ import annotations

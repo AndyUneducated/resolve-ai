@@ -24,7 +24,7 @@ type RunMetrics = {
   guardrailLatencyMs?: Record<string, number>;
 };
 
-/** sse-starlette 使用 CRLF；用 `\n\n` 切事件前需归一化，否则会整包粘在一起、JSON 带 `\r` 解析失败。 */
+/** sse-starlette uses CRLF. Normalize before splitting on `\n\n` to prevent merged events and JSON parse failures from trailing `\r`. */
 function splitSseEvents(raw: string): { events: string[]; rest: string } {
   const normalized = raw.replace(/\r\n/g, "\n");
   const parts = normalized.split("\n\n");
@@ -32,12 +32,12 @@ function splitSseEvents(raw: string): { events: string[]; rest: string } {
   return { events: parts, rest };
 }
 
-/** 首页卡片带 ?preset= 跳转时预填输入框，便于按场景试用。 */
+/** Prefill the input when a home-page card links here with ?preset= for scenario-based demos. */
 const PRESETS: Record<string, string> = {
-  triage: "我想先了解一下你们主要能处理哪些类型的问题？",
-  billing: "我上个月被多扣了 $99，请帮我查扣款记录并申请退款。",
-  technical: "我们集成的 API 偶尔返回 502，能帮我看看可能原因吗？",
-  escalation: "这个问题必须人工处理，请帮我升级并安排主管回访。",
+  triage: "What types of issues can you help me with?",
+  billing: "I was overcharged $99 last month. Please review the charge and request a refund.",
+  technical: "Our API integration occasionally returns a 502. Can you help identify possible causes?",
+  escalation: "This issue requires human assistance. Please escalate it and arrange a follow-up from a supervisor.",
 };
 
 function ChatPageContent() {
@@ -96,11 +96,11 @@ function ChatPageContent() {
 
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
-        setError(`请求失败 HTTP ${res.status}${detail ? ` — ${detail.slice(0, 240)}` : ""}`);
+        setError(`Request failed: HTTP ${res.status}${detail ? ` — ${detail.slice(0, 240)}` : ""}`);
         return;
       }
       if (!res.body) {
-        setError("响应没有可读取的正文（body）。");
+        setError("The response has no readable body.");
         return;
       }
 
@@ -144,7 +144,7 @@ function ChatPageContent() {
           }
           if (eventName === "human_owned") {
             setNotice(
-              `该会话已被人工坐席接管（${String(payload.owner ?? "")}），自动化已暂停。`,
+              `This conversation is now owned by a human agent (${String(payload.owner ?? "")}); automation has been paused.`,
             );
             return;
           }
@@ -196,11 +196,13 @@ function ChatPageContent() {
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
         setError(
-          "等待超过 3 分钟已中止。计费链路会多次调用本地 Ollama，请确认本机已运行 ollama serve，且 ollama list 中已有 .env 里 TRIAGE_MODEL / VERTICAL_MODEL 对应的模型；同时查看运行 API 的终端是否有报错。"
+          "The request was canceled after waiting more than 3 minutes. The billing flow calls local Ollama several times. Confirm that `ollama serve` is running and that `ollama list` includes the models configured as TRIAGE_MODEL and VERTICAL_MODEL in .env. Also check the API terminal for errors."
         );
       } else {
         setError(
-          e instanceof Error ? e.message : "网络错误（请确认后端已启动且 CORS 允许本页来源）"
+          e instanceof Error
+            ? e.message
+            : "Network error. Confirm that the backend is running and CORS allows this page's origin."
         );
       }
     } finally {
@@ -221,7 +223,7 @@ function ChatPageContent() {
         body: JSON.stringify({ decision, by: "web-operator" }),
       });
       if (!res.ok) {
-        setError(`审批失败 HTTP ${res.status}`);
+        setError(`Approval failed: HTTP ${res.status}`);
         return;
       }
       setPending((prev) =>
@@ -229,7 +231,7 @@ function ChatPageContent() {
       );
       if (decision === "approve") await send(); // resume-by-replay
     } catch (e) {
-      setError(e instanceof Error ? e.message : "审批请求失败");
+      setError(e instanceof Error ? e.message : "Approval request failed");
     }
   }
 
@@ -252,7 +254,8 @@ function ChatPageContent() {
       {pending && pending.items.length > 0 && (
         <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
           <p className="text-sm font-medium text-amber-200">
-            需人工审批（Human-in-the-Loop）：{pending.items.length} 个高风险动作已挂起
+            Human approval required: {pending.items.length} high-risk{" "}
+            {pending.items.length === 1 ? "action is" : "actions are"} pending
           </p>
           <ul className="mt-3 space-y-3">
             {pending.items.map((it) => (
@@ -273,7 +276,7 @@ function ChatPageContent() {
                     disabled={streaming}
                     className="rounded-md bg-emerald-600 px-3 py-1 text-xs text-white disabled:opacity-50"
                   >
-                    批准并继续
+                    Approve and continue
                   </button>
                   <button
                     type="button"
@@ -281,7 +284,7 @@ function ChatPageContent() {
                     disabled={streaming}
                     className="rounded-md bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
                   >
-                    拒绝
+                    Deny
                   </button>
                 </div>
               </li>
@@ -293,8 +296,8 @@ function ChatPageContent() {
       <div className="flex gap-2">
         <input
           className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          placeholder="描述你的问题…"
-          aria-label="描述你的问题"
+          placeholder="Describe your issue…"
+          aria-label="Describe your issue"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
@@ -305,10 +308,10 @@ function ChatPageContent() {
           onClick={send}
           disabled={streaming}
           aria-busy={streaming}
-          aria-label={streaming ? "处理中" : "发送"}
+          aria-label={streaming ? "Processing" : "Send"}
           className="rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
         >
-          {streaming ? "Thinking…" : "发送"}
+          {streaming ? "Thinking…" : "Send"}
         </button>
       </div>
 
@@ -318,20 +321,24 @@ function ChatPageContent() {
         aria-busy={streaming}>
         {streaming && steps.length === 0 && (
           <div className="text-sm text-foreground/70">
-            <p className="font-medium text-foreground/90">正在处理…</p>
+            <p className="font-medium text-foreground/90">Processing…</p>
             <p className="mt-2 leading-relaxed">
-              首条内容要等后端跑完 <strong>Triage</strong> 后才会推送；进入计费后还会多次调用垂直模型（默认与 .env 中{" "}
-              <code className="rounded bg-muted px-1">VERTICAL_MODEL</code> 一致），在 CPU 上仍可能需<strong>较久</strong>。
+              The first update is sent after the backend completes <strong>Triage</strong>. The
+              billing flow then calls the vertical model several times (configured by{" "}
+              <code className="rounded bg-muted px-1">VERTICAL_MODEL</code> in .env), which can
+              take <strong>some time</strong> on a CPU.
             </p>
             <p className="mt-2 text-xs text-foreground/50">
-              若一直无输出：在终端执行 <code className="rounded bg-muted px-1">ollama serve</code>，并{" "}
-              <code className="rounded bg-muted px-1">ollama list</code> 确认已有 .env 中配置的模型名称。
+              If no output appears, run <code className="rounded bg-muted px-1">ollama serve</code>{" "}
+              in a terminal, then use <code className="rounded bg-muted px-1">ollama list</code>{" "}
+              to confirm that the models configured in .env are installed.
             </p>
           </div>
         )}
         {!streaming && steps.length === 0 && (
           <div className="text-sm text-foreground/50">
-            发送后，Agent 步骤会显示在这里。可试「我上个月被多扣了 $99」。
+            Agent steps will appear here after you send a message. Try “I was overcharged $99
+            last month.”
           </div>
         )}
         {steps.map((s, i) => (
@@ -378,7 +385,7 @@ function ChatPageContent() {
 
       {metrics && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground/70">
-          <span className="font-medium text-foreground/90">本次运行</span>
+          <span className="font-medium text-foreground/90">This run</span>
           <span>
             tokens: <code className="rounded bg-background/60 px-1">{metrics.tokens ?? "—"}</code>
           </span>
@@ -409,7 +416,7 @@ export default function ChatPage() {
       fallback={
         <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12">
           <h1 className="text-2xl font-semibold">Chat with ResolveAI</h1>
-          <p className="text-sm text-foreground/50">加载中…</p>
+          <p className="text-sm text-foreground/50">Loading…</p>
         </main>
       }
     >

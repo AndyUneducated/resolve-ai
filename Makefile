@@ -12,35 +12,35 @@ MIGRATE_DSN ?= postgresql://resolveai:resolveai@localhost:5432/resolveai
 
 help:
 	@echo "Targets:"
-	@echo "  install         安装 Python + Node 依赖"
-	@echo "  dev             同时启动后端 (api) + 前端 (web)"
-	@echo "  api             仅启动 FastAPI 后端"
-	@echo "  web             仅启动 Next.js 前端"
-	@echo "  seed            初始化 Postgres + 灌入 FAQ / 演示 ticket"
-	@echo "  db-migrate      对已存在的库应用 RLS 迁移（新容器已自动烧入；存量 volume 用这个）"
-	@echo "  test            跑 pytest + frontend lint"
-	@echo "  red-team        跑 200 个 adversarial prompt"
-	@echo "  chaos           5K mock ticket 并发压测（M8，默认 fake backend）"
-	@echo "  regression-gate online regression 门禁（对比 baseline，含 mean_cost_usd 成本回归）"
-	@echo "  demo-assets     生成 demo 用 metrics.html / trace.html"
-	@echo "  demo-record     生成 assets 后用 Playwright 录制 demo 视频"
-	@echo "  obs             启动可观测栈：OTel collector + Tempo + Prometheus + Grafana（--profile obs）"
-	@echo "  obs-down        拆掉可观测栈"
-	@echo "  metrics         curl 本地 /metrics（需先 make api）"
-	@echo "  stack-up        一键起全栈（postgres + api + web，M15；首次会 build 镜像）"
-	@echo "  stack-down      拆掉全栈"
-	@echo "  stack-logs      跟随全栈日志"
-	@echo "  smoke           对已起的全栈跑冒烟（health + web + chat 往返）"
+	@echo "  install         Install Python + Node dependencies"
+	@echo "  dev             Start the backend (api) + frontend (web) together"
+	@echo "  api             Start only the FastAPI backend"
+	@echo "  web             Start only the Next.js frontend"
+	@echo "  seed            Initialize Postgres + seed FAQ / demo tickets"
+	@echo "  db-migrate      Apply the RLS migration to an existing database (automatic for new containers; use this for existing volumes)"
+	@echo "  test            Run pytest + frontend lint"
+	@echo "  red-team        Run 200 adversarial prompts"
+	@echo "  chaos           Load-test 5K concurrent mock tickets (M8, fake backend by default)"
+	@echo "  regression-gate Online regression gate (compares baseline, including mean_cost_usd cost regression)"
+	@echo "  demo-assets     Generate metrics.html / trace.html for the demo"
+	@echo "  demo-record     Generate assets, then record the demo video with Playwright"
+	@echo "  obs             Start the observability stack: OTel collector + Tempo + Prometheus + Grafana (--profile obs)"
+	@echo "  obs-down        Tear down the observability stack"
+	@echo "  metrics         curl the local /metrics endpoint (run make api first)"
+	@echo "  stack-up        Start the full stack (postgres + api + web, M15; builds images on first run)"
+	@echo "  stack-down      Tear down the full stack"
+	@echo "  stack-logs      Follow full-stack logs"
+	@echo "  smoke           Run smoke tests against the active stack (health + web + chat round trip)"
 	@echo "  lint            ruff + eslint"
 	@echo "  fmt             ruff format + prettier"
-	@echo "  typecheck       mypy（source + packages，与 CI 门禁同口径）+ tsc"
+	@echo "  typecheck       mypy (source + packages, matching the CI gate) + tsc"
 
 install:
 	uv sync
 	cd apps/web && npm install
 
 dev:
-	@echo "→ 后端 :8000   前端 :3000"
+	@echo "→ backend :8000   frontend :3000"
 	@( $(MAKE) api & $(MAKE) web & wait )
 
 api:

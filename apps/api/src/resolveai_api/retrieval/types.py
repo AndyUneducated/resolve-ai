@@ -1,4 +1,4 @@
-"""共享检索数据类型 — 单独成模块，避免 store/reranker/hybrid 循环依赖。"""
+"""Shared retrieval data types, separated to avoid store/reranker/hybrid cycles."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class RetrievedDoc:
-    """统一检索返回契约。`id` 即 KB doc id，Agent 引用与 grounding 校验都基于它。"""
+    """Unified retrieval result contract; `id` is the KB document ID used for citations and grounding."""
 
     id: int
     title: str
@@ -15,12 +15,12 @@ class RetrievedDoc:
     score: float
     metadata: dict[str, object]
     source: str = "hybrid"
-    """召回来源：dense | lexical | fused | rerank — 用于可观测性。"""
+    """Retrieval source: dense | lexical | fused | rerank, used for observability."""
 
 
 @dataclass
 class RetrievalTrace:
-    """单次检索的可观测快照（送 OTel span / EvalGate / Agent tool_calls）。"""
+    """Observable snapshot of one retrieval sent to OTel, EvalGate, and agent tool calls."""
 
     query: str
     tenant_id: str

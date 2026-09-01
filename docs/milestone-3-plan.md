@@ -1,49 +1,49 @@
-# Milestone 3 — 技术实现方案
+# Milestone 3 — Technical implementation plan
 
-**Status:** 已实现（见 [roadmap.md](roadmap.md) Milestone 3）。
+**Status:** Implemented (see [roadmap.md](roadmap.md) Milestone 3).
 
-**Goal（目标）:** 补齐 MCP-native 工具层剩下的部分，具体三件事：
+**Goal:** Finish the remaining MCP-native tool layer, specifically three things:
 
-1. 把 Zendesk / Slack / Salesforce / Intercom 从只有 `TOOLS` 的桩（stub）升级成**真实的 stdio MCP server**（对齐 M2 的 Stripe 模板）；
-2. 用 `ToolBelt` 统一包装工具发现（discovery）；
-3. 把 capability（能力）关卡从只拦 `destructive` 扩展到 **write + destructive 都默认拒绝（default-deny）**。
+1. Upgrade Zendesk / Slack / Salesforce / Intercom from `TOOLS`-only stubs to **real stdio MCP servers** (aligned with the M2 Stripe template);
+2. Wrap tool discovery in a unified `ToolBelt`;
+3. Extend the capability gate from blocking only `destructive` to **default-deny for both write and destructive**.
 
-全程**不需要任何外部 SaaS 凭据**——每个 server 都沿用 `mcp_servers.stripe` 的「mock 优先、内存里确定性数据」模式。
+No external SaaS credentials are required at any point — each server follows the `mcp_servers.stripe` “mock-first, in-memory deterministic data” pattern.
 
 ---
 
-## 1. 行业对齐（2026 默认选型）
+## 1. Industry alignment (2026 default choices)
 
-| 子系统 | 选型 | 理由 |
+| Subsystem | Choice | Rationale |
 |-----------|--------|-----------|
-| Tool protocol | **Anthropic MCP**（`mcp.server.lowlevel.Server` + `stdio_server`） | 2025 起 de-facto standard（Anthropic + OpenAI + Cursor + Bedrock） |
-| Client bridge | `langchain-mcp-adapters` `MultiServerMCPClient.get_tools()` | 官方 LangChain ↔ MCP adapter；自动转换为 `BaseTool` |
-| Tool registry | 新 `ToolBelt` class 包装 `loader.py` | Single source of truth + per-agent filtering + JSON manifest |
-| Capability policy | **read / write / destructive**，后两者 default-deny | 对齐 OpenAI tool calling + Anthropic computer-use guidance + Bedrock Agents IAM model |
-| Mock servers | Stripe-template（`server.py` + `data.py` + `reset_store()`） | Deterministic；与未来 real adapter 契约相同 |
+| Tool protocol | **Anthropic MCP** (`mcp.server.lowlevel.Server` + `stdio_server`) | De-facto standard since 2025 (Anthropic + OpenAI + Cursor + Bedrock) |
+| Client bridge | `langchain-mcp-adapters` `MultiServerMCPClient.get_tools()` | Official LangChain ↔ MCP adapter; auto-converts to `BaseTool` |
+| Tool registry | New `ToolBelt` class wrapping `loader.py` | Single source of truth + per-agent filtering + JSON manifest |
+| Capability policy | **read / write / destructive**, latter two default-deny | Aligned with OpenAI tool calling + Anthropic computer-use guidance + Bedrock Agents IAM model |
+| Mock servers | Stripe-template (`server.py` + `data.py` + `reset_store()`) | Deterministic; same contract as a future real adapter |
 
-一句话概括：
+In one sentence:
 
-> *Agents 接触的每个 SaaS 都经 MCP 到达；API 在 startup 时 discovery tools，标注 `(server, capability, full_name)`，Executor 拒绝任何 agent 未显式 grant 的 `write` 或 `destructive` 调用。*
+> *Every SaaS an agent touches is reached via MCP; the API discovers tools at startup, annotates `(server, capability, full_name)`, and the Executor rejects any `write` or `destructive` call the agent did not explicitly grant.*
 
 ---
 
-## 2. 交付物
+## 2. Deliverables
 
 | # | Item | Notes |
 |---|------|-------|
-| 1 | 4 个新 MCP server（Zendesk / Slack / Salesforce / Intercom） | 镜像 Stripe layout；deterministic seed data；failure paths |
+| 1 | 4 new MCP servers (Zendesk / Slack / Salesforce / Intercom) | Mirror Stripe layout; deterministic seed data; failure paths |
 | 2 | `mcp.toolbelt.ToolBelt` | Discovery + per-agent slice + capability lookup + manifest |
-| 3 | Executor 三档 capability gate | `write` 和 `destructive` 需显式 grant；`read` default-allow |
-| 4 | Tests：per-server happy + error paths、multi-server discovery、capability matrix | Hermetic，无 network |
-| 5 | `Technical` + `Escalation` agents 复用 billing Plan-Execute-Replan subgraph | 每个 agent 获得 sliced toolbelt |
-| 6 | 更新 `.env.example` 启用全部 5 个 `MCP_*_CMD` | 文档说明 Stripe-only fallback |
+| 3 | Executor three-tier capability gate | `write` and `destructive` need an explicit grant; `read` default-allow |
+| 4 | Tests: per-server happy + error paths, multi-server discovery, capability matrix | Hermetic, no network |
+| 5 | `Technical` + `Escalation` agents reuse the billing Plan-Execute-Replan subgraph | Each agent gets a sliced toolbelt |
+| 6 | Update `.env.example` to enable all 5 `MCP_*_CMD` | Document Stripe-only fallback |
 
 ---
 
-## 3. 逐 server 契约
+## 3. Per-server contract
 
-每个新 package 镜像 `packages/mcp-servers/stripe/`：
+Each new package mirrors `packages/mcp-servers/stripe/`:
 
 ```
 packages/mcp-servers/<name>/
@@ -55,7 +55,7 @@ packages/mcp-servers/<name>/
     data.py            # in-memory store + reset_store()
 ```
 
-Capability triage 覆盖 roadmap 后续（Escalation / Technical）：
+Capability triage covers later roadmap consumers (Escalation / Technical):
 
 | Server | Tool | Capability | Consumer |
 |--------|------|------------|----------|
@@ -69,17 +69,17 @@ Capability triage 覆盖 roadmap 后续（Escalation / Technical）：
 | **Intercom** | `get_conversation(conversation_id)` | `read` | Technical |
 | | `tag_user(user_id, tag)` | `write` | Technical |
 
-每个 server 必须包含：
+Each server must include:
 
-- `*_not_found` error path，
-- idempotent state transition（如 re-escalating 已 escalated ticket 抛出 `already_escalated` 等），
-- `reset_store()` hook，由 `apps/api/tests/conftest.py` autouse。
+- a `*_not_found` error path,
+- idempotent state transitions (e.g. re-escalating an already-escalated ticket raises `already_escalated`),
+- a `reset_store()` hook, autoused by `apps/api/tests/conftest.py`.
 
 ---
 
-## 4. `ToolBelt` 设计
+## 4. `ToolBelt` design
 
-`apps/api/src/resolveai_api/mcp/toolbelt.py`：
+`apps/api/src/resolveai_api/mcp/toolbelt.py`:
 
 ```python
 class ToolBelt:
@@ -100,87 +100,87 @@ class ToolBelt:
         """Serializable view for /admin and ablation logs."""
 ```
 
-Lifespan 简化为：
+Lifespan simplifies to:
 
 ```python
 toolbelt = await ToolBelt.from_settings()
 app.state.supervisor = SupervisorGraph(checkpointer=checkpointer, toolbelt=toolbelt)
 ```
 
-`SupervisorGraph._build_agents()` 从 `filter_by_whitelist(mcp_tools, …)` 切换为 `toolbelt.for_agent(WHITELIST)`。Agent 代码不再引用 `loader.py`。
+`SupervisorGraph._build_agents()` switches from `filter_by_whitelist(mcp_tools, …)` to `toolbelt.for_agent(WHITELIST)`. Agent code no longer references `loader.py`.
 
-工具从「5 个 MCP server」到「Agent 能调用的那几个」要经过三步：startup 时发现并标注，按 Agent 白名单切片，最后由 Executor 在每次调用时按 capability 把关。
+Getting from “5 MCP servers” to “the few tools an agent may call” is three steps: discover and annotate at startup, slice by agent whitelist, then let the Executor enforce capability on every call.
 
 ```mermaid
 flowchart TD
-  subgraph servers["5 个 MCP server（stdio）"]
+  subgraph servers["5 MCP servers (stdio)"]
     z[Zendesk]
     st[Stripe]
     sl[Slack]
     sf[Salesforce]
     ic[Intercom]
   end
-  servers -->|"startup discovery"| belt["ToolBelt<br/>标注 (server, capability, full_name)"]
-  belt -->|"for_agent(whitelist)"| billing["Billing Agent<br/>工具子集"]
-  belt -->|"for_agent(whitelist)"| tech["Technical Agent<br/>工具子集"]
-  belt -->|"for_agent(whitelist)"| esc["Escalation Agent<br/>工具子集"]
+  servers -->|"startup discovery"| belt["ToolBelt<br/>annotate (server, capability, full_name)"]
+  belt -->|"for_agent(whitelist)"| billing["Billing Agent<br/>tool subset"]
+  belt -->|"for_agent(whitelist)"| tech["Technical Agent<br/>tool subset"]
+  belt -->|"for_agent(whitelist)"| esc["Escalation Agent<br/>tool subset"]
   billing --> exec
   tech --> exec
   esc --> exec
-  exec{"Executor capability 关卡"}
-  exec -->|"read → 放行"| ok["执行工具调用"]
-  exec -->|"write / destructive<br/>未 grant → 拒绝"| deny["PermissionError"]
+  exec{"Executor capability gate"}
+  exec -->|"read → allow"| ok["Execute tool call"]
+  exec -->|"write / destructive<br/>not granted → deny"| deny["PermissionError"]
   exec -->|"destructive → audit log"| ok
 ```
 
 ---
 
-## 5. Capability policy 升级
+## 5. Capability policy upgrade
 
-当前状态（[`core/executor.py`](../apps/api/src/resolveai_api/core/executor.py)）仅 block `destructive`。M3 之后：
+Current state ([`core/executor.py`](../apps/api/src/resolveai_api/core/executor.py)) only blocks `destructive`. After M3:
 
 | Capability | Default | Requirement |
 |------------|---------|-------------|
 | `read` | allow | — |
-| `write` | **deny** | `full_name` 必须在 agent whitelist 中 |
-| `destructive` | **deny + audit** | whitelist + 每次调用写 log entry |
+| `write` | **deny** | `full_name` must be on the agent whitelist |
+| `destructive` | **deny + audit** | whitelist + write a log entry on every call |
 
-Errors 保持现有 `PermissionError(f"{capability} tool {full!r} not granted (whitelist=...)")` 形态，billing subgraph 外围 `try/except` 仍将其记为 `past_steps` observations。
+Errors keep the existing `PermissionError(f"{capability} tool {full!r} not granted (whitelist=...)")` shape; the billing subgraph’s outer `try/except` still records them as `past_steps` observations.
 
 ---
 
-## 6. Tests（M3 新增）
+## 6. Tests (new in M3)
 
-| File | 锁定行为 |
+| File | Behavior locked |
 |------|--------------------|
-| `apps/api/tests/test_zendesk_mcp.py` | `list_tools`、ticket read、update、escalate happy + sad |
+| `apps/api/tests/test_zendesk_mcp.py` | `list_tools`, ticket read, update, escalate happy + sad |
 | `apps/api/tests/test_slack_mcp.py` | `notify_team` happy + mention parsing |
 | `apps/api/tests/test_salesforce_mcp.py` | account fetch + opportunity update |
 | `apps/api/tests/test_intercom_mcp.py` | conversation fetch + tag user |
-| `apps/api/tests/test_toolbelt.py` | `ToolBelt.from_settings()` 发现全部 5 个 server；manifest fields 齐全 |
-| `apps/api/tests/test_capability_whitelist.py`（扩展） | 无 grant 时 `write` denied；`destructive` audited |
+| `apps/api/tests/test_toolbelt.py` | `ToolBelt.from_settings()` discovers all 5 servers; manifest fields complete |
+| `apps/api/tests/test_capability_whitelist.py` (extended) | `write` denied without grant; `destructive` audited |
 
-所有测试保持 hermetic — 无真实 network、无外部 SaaS calls。
+All tests stay hermetic — no real network, no external SaaS calls.
 
 ---
 
-## 7. 交付 checklist
+## 7. Delivery checklist
 
-- [x] **zendesk** — 真实 stdio server + `data.py` + tests
-- [x] **slack** — 真实 stdio server + `data.py` + tests
-- [x] **salesforce** — 真实 stdio server + `data.py` + tests
-- [x] **intercom** — 真实 stdio server + `data.py` + tests
+- [x] **zendesk** — real stdio server + `data.py` + tests
+- [x] **slack** — real stdio server + `data.py` + tests
+- [x] **salesforce** — real stdio server + `data.py` + tests
+- [x] **intercom** — real stdio server + `data.py` + tests
 - [x] **toolbelt** — `ToolBelt` class + lifespan wiring + `SupervisorGraph` plumbing
-- [x] **capability** — Executor 强制 `write` + `destructive`；destructive 上 `audit=True`
-- [x] **agents** — Escalation 跑 deterministic Slack + Zendesk handoff；Technical 拉 Zendesk ticket history（Plan-Execute-Replan 复用延至 M6 KB retrieval 落地后）
-- [x] **multi-loader** — `test_toolbelt.py::test_from_settings_discovers_all_five_servers` 证明 5 server 端到端可 discovery
-- [x] **env** — `.env.example` 默认列出全部 5 个 `MCP_*_CMD`；`conftest.py` autouse 重置每个 store
-- [x] **verify** — `uv run python -m pytest` 绿（65 tests）；roadmap M3 打勾
+- [x] **capability** — Executor enforces `write` + `destructive`; `audit=True` on destructive
+- [x] **agents** — Escalation runs deterministic Slack + Zendesk handoff; Technical pulls Zendesk ticket history (Plan-Execute-Replan reuse deferred until M6 KB retrieval lands)
+- [x] **multi-loader** — `test_toolbelt.py::test_from_settings_discovers_all_five_servers` proves 5-server end-to-end discovery
+- [x] **env** — `.env.example` lists all 5 `MCP_*_CMD` by default; `conftest.py` autouse resets each store
+- [x] **verify** — `uv run python -m pytest` green (65 tests); roadmap M3 checked off
 
 ---
 
-## 8. Non-goals（延至后续 milestone）
+## 8. Non-goals (deferred to later milestones)
 
-- 对 Zendesk / Slack / Salesforce / Intercom 的真实 HTTP calls（key-gated `live` mode 为 follow-on；见 M9 / dedicated milestone）。MCP 有意设计成后续把 `data.py` 换成 `client_real.py` 也不动 agent 或 executor 代码。
-- Streaming tool responses（MCP 支持；暂不需要）。
-- `/admin/tools` UI surface（Phase 2 — `manifest()` 已返回其将消费的 JSON）。
+- Real HTTP calls to Zendesk / Slack / Salesforce / Intercom (key-gated `live` mode is follow-on; see M9 / a dedicated milestone). MCP is intentionally designed so swapping `data.py` for `client_real.py` later does not move agent or executor code.
+- Streaming tool responses (MCP supports this; not needed yet).
+- `/admin/tools` UI surface (Phase 2 — `manifest()` already returns the JSON it will consume).

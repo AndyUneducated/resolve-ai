@@ -1,6 +1,6 @@
-"""OTel 装配 — FastAPI 自动 instrument + 自定义 Agent / Tool span。
+"""OTel setup with FastAPI auto-instrumentation and custom agent/tool spans.
 
-EvalGate 通过 OTel collector 拉到 trace 后做 online regression。
+EvalGate retrieves traces through the OTel collector for online regression.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def span(
 
 def setup_tracing(app: FastAPI, *, service_name: str, endpoint: str) -> None:
     if not endpoint:
-        logger.info("OTel endpoint 未配置，跳过 tracing 装配。")
+        logger.info("OTel endpoint is not configured; skipping tracing setup.")
         return
 
     try:
@@ -64,7 +64,7 @@ def setup_tracing(app: FastAPI, *, service_name: str, endpoint: str) -> None:
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
     except ImportError:
-        logger.warning("OTel SDK 未安装，跳过 tracing。")
+        logger.warning("OTel SDK is not installed; skipping tracing.")
         return
 
     resource = Resource.create({"service.name": service_name})

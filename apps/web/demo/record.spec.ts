@@ -61,7 +61,7 @@ async function sendChat(page: import("@playwright/test").Page, message: string) 
   if ((await input.count().catch(() => 0)) === 0) return;
   await input.fill(message, { timeout: 5_000 }).catch(() => undefined);
   await page
-    .getByRole("button", { name: /发送|Thinking/ })
+    .getByRole("button", { name: /Send|Thinking/ })
     .click({ timeout: 5_000 })
     .catch(() => undefined);
   // Wait until the stream completes (button text flips back from "Thinking…"),
@@ -87,7 +87,7 @@ test("ResolveAI 3-minute demo", async ({ page }) => {
   await page.waitForTimeout(PACE / 2);
   await sendChat(
     page,
-    "我上个月被多扣了 $99（charge ch_0001），请帮我查扣款并申请退款。",
+    "I was overcharged $99 last month (charge ch_0001). Please review the charge and request a refund.",
   );
   await page.waitForTimeout(PACE);
 

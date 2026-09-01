@@ -1,14 +1,16 @@
-"""灌入 KB 演示数据：FAQ / runbook 文档 + embedding（M6 Hybrid Retrieval）。
+"""Seed KB demo data: FAQ / runbook documents + embeddings (M6 Hybrid Retrieval).
 
-调库优先：
-- DB 写入走 SQLAlchemy + psycopg（仓库已有依赖），不手搓连接池。
-- 向量化走 `retrieval.embedder.make_embedder()`（默认 OllamaEmbeddings bge-m3，1024 维）。
-- 文档源是单一 fixture（`apps/api/tests/fixtures/kb_documents.jsonl`），demo / 评测 /
-  压测共用同一 corpus。
+Prefer existing libraries:
+- Write to the database through SQLAlchemy + psycopg (already repository dependencies)
+  instead of implementing a connection pool.
+- Generate vectors with `retrieval.embedder.make_embedder()` (default:
+  OllamaEmbeddings bge-m3, 1024 dimensions).
+- Use one document fixture (`apps/api/tests/fixtures/kb_documents.jsonl`) as the shared
+  corpus for demos, evaluation, and load tests.
 
-幂等：按 (tenant_id, title) 删旧插新，可重复运行。
+Idempotent: delete and reinsert by (tenant_id, title), so repeated runs are safe.
 
-用法:
+Usage:
     uv run python scripts/seed_db.py
     uv run python scripts/seed_db.py --tenant demo --truncate
 """
@@ -70,9 +72,10 @@ async def seed_kb(*, tenant_id: str, kb_path: Path, truncate: bool) -> int:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     inserted = 0
     async with engine.begin() as conn:
-        # FORCE ROW LEVEL SECURITY 下表 owner 也受 policy 约束（M9）：必须先把
-        # app.tenant_id 注入事务，否则 tenants / kb_documents 的 WITH CHECK 会拒插入。
-        # set_config(..., true) = SET LOCAL，随事务结束自动失效（fail-closed）。
+        # FORCE ROW LEVEL SECURITY subjects table owners to policies (M9). Inject
+        # app.tenant_id into the transaction first, or WITH CHECK on tenants /
+        # kb_documents will reject inserts. set_config(..., true) is SET LOCAL and
+        # expires automatically when the transaction ends (fail closed).
         await conn.execute(
             text("SELECT set_config('app.tenant_id', :t, true)"),
             {"t": tenant_id},

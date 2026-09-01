@@ -135,7 +135,7 @@ async def _collect_scenarios() -> list[dict[str, Any]]:
 
     # 1. Normal billing ticket.
     ev, ifl = await _run(
-        "我上个月被多扣了 $99（charge ch_0001），请帮我查扣款并申请退款。",
+        "I was overcharged $99 last month (charge ch_0001). Please review the charge and request a refund.",
         customer_id="cus_demo_001",
         tenant_id="demo",
         thread_id="demo-normal",

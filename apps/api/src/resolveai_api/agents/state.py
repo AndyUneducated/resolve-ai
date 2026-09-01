@@ -1,9 +1,10 @@
-"""LangGraph 共享 state — Stateful Handoff 的载体。
+"""Shared LangGraph state for stateful handoffs.
 
-决策 1 关键：handoff 时只传**结构化 ticket summary** 而非整段对话，
-配合 LangGraph state checkpointing 实现：
-  1. ~60% token 降幅
-  2. 中断恢复（用户回来续聊 / Agent crash 重连 / 跨班次接力）
+The key to Decision 1 is passing only a structured ticket summary during
+handoff rather than the full conversation. Combined with LangGraph state
+checkpointing, this provides:
+  1. Approximately 60% token reduction
+  2. Interruption recovery for returning users, agent crashes, and shift handoffs
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ AgentName = Literal["triage", "billing", "technical", "escalation"]
 
 
 class TicketSummary(TypedDict, total=False):
-    """跨 Agent handoff 的结构化载荷 — 不传整段对话。"""
+    """Structured payload for cross-agent handoff; excludes the full conversation."""
 
     intent: str
     customer_id: str
@@ -27,28 +28,29 @@ class TicketSummary(TypedDict, total=False):
 
 
 class GraphState(TypedDict, total=False):
-    # LangGraph 内置 messages reducer
+    # LangGraph's built-in messages reducer.
     messages: Annotated[list, add_messages]
 
-    # 多租户 / 多客户隔离 key（决策 4 · Layer 4）
+    # Multi-tenant and multi-customer isolation keys (Decision 4 · Layer 4).
     tenant_id: str
     customer_id: str
     thread_id: str
 
-    # 当前路由到的 Agent
+    # Agent currently handling the request.
     current_agent: AgentName
 
-    # 跨 Agent handoff 载荷（结构化）
+    # Structured cross-agent handoff payload.
     ticket_summary: TicketSummary
 
-    # Plan-and-Execute 计划（决策 1）
+    # Plan-and-Execute plan (Decision 1).
     plan: list[str]
 
-    # 工具调用 trace（流给前端 + 给 EvalGate）
+    # Tool-call trace streamed to the frontend and EvalGate.
     tool_calls: list[dict[str, object]]
 
-    # Guardrails 标记
+    # Guardrail flags.
     guardrail_flags: list[str]
 
-    # 业务 Agent 请求转人工 → Supervisor 路由到 escalation 节点（真接力，非文字建议）
+    # A business agent requests human intervention; the Supervisor routes to
+    # the escalation node for a real handoff rather than a textual suggestion.
     escalate: bool

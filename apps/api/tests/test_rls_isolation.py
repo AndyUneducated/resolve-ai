@@ -1,14 +1,15 @@
-"""Postgres Row-Level Security 负向测试 (M9 · 多租户硬隔离).
+"""Negative Postgres Row-Level Security tests (M9 · strict multi-tenant isolation).
 
-验证数据库层（而非应用层）的隔离：
-  1. 设了 tenant A 上下文 → 看不到 tenant B 的行；
-  2. 在 tenant A 上下文里写 tenant B 的行 → 被 `WITH CHECK` 拒；
-  3. 完全不设上下文 → 0 行 (fail-closed)。
+Verify isolation at the database layer rather than the application layer:
+  1. Tenant A context cannot see tenant B rows.
+  2. Writing a tenant B row from tenant A context is rejected by `WITH CHECK`.
+  3. No context returns zero rows (fail closed).
 
-需要 live Postgres、已应用 `infra/docker/migrations/0001_rls.sql`，**且应用以低权限
-角色 `resolveai_app` 连库**（设 `APP_DATABASE_URL`）——超级用户 / BYPASSRLS 角色无条件
-绕过 RLS，FORCE 也拦不住。任一条件不满足则自动 skip，保持默认 suite hermetic。
-Embedding-free：只动 kb_documents 的明文列。
+Requires live Postgres with `infra/docker/migrations/0001_rls.sql` applied and an
+application connection using the low-privilege `resolveai_app` role (set
+`APP_DATABASE_URL`). Superuser / BYPASSRLS roles always bypass RLS, even with
+FORCE. Skip automatically if any requirement is unmet to keep the default suite
+hermetic. Embedding-free: touches only plaintext kb_documents columns.
 """
 
 from __future__ import annotations
@@ -102,7 +103,8 @@ async def test_rls_blocks_cross_tenant_read() -> None:
         await _seed_tenant(engine, tenant_a, title="A doc", content="alpha content a")
         await _seed_tenant(engine, tenant_b, title="B doc", content="bravo content b")
 
-        # NOTE: 故意不带 WHERE tenant_id —— 让 RLS 兜底，模拟「应用漏写过滤」的 bug。
+        # NOTE: Intentionally omit WHERE tenant_id so RLS provides the fallback,
+        # simulating an application bug that forgot the filter.
         async with tenant_session(engine, tenant_a) as conn:
             titles = [
                 r[0]
@@ -110,8 +112,8 @@ async def test_rls_blocks_cross_tenant_read() -> None:
                     await conn.execute(text("SELECT title FROM kb_documents"))
                 ).fetchall()
             ]
-        assert "A doc" in titles, "tenant A 应能看到自己的行"
-        assert "B doc" not in titles, "RLS 未拦住跨租户读 —— tenant A 看到了 B 的行"
+        assert "A doc" in titles, "tenant A should be able to see its own row"
+        assert "B doc" not in titles, "RLS failed to block tenant A from reading tenant B's row"
     finally:
         await _cleanup(engine, [tenant_a, tenant_b])
 
@@ -129,7 +131,7 @@ async def test_rls_with_check_blocks_cross_tenant_write() -> None:
 
         with pytest.raises(Exception) as exc_info:
             async with tenant_session(engine, tenant_a) as conn:
-                # 在 A 的上下文里写一条 tenant_id = B 的行 → WITH CHECK 必须拒绝。
+                # Write a tenant_id = B row from A's context; WITH CHECK must reject it.
                 await conn.execute(
                     text(
                         "INSERT INTO kb_documents (tenant_id, title, content) "
@@ -150,7 +152,7 @@ async def test_rls_fail_closed_without_context() -> None:
     try:
         await _seed_tenant(engine, tenant_a, title="A doc", content="alpha content a")
 
-        # 不设 app.tenant_id：current_setting(..., true) → NULL → 0 行 (fail-closed)。
+        # Without app.tenant_id, current_setting(..., true) → NULL → zero rows (fail closed).
         async with engine.connect() as conn:
             count = (
                 await conn.execute(
@@ -158,6 +160,6 @@ async def test_rls_fail_closed_without_context() -> None:
                     {"t": tenant_a},
                 )
             ).scalar_one()
-        assert count == 0, "未设租户上下文却看到了行 —— RLS 不是 fail-closed"
+        assert count == 0, "rows were visible without tenant context; RLS did not fail closed"
     finally:
         await _cleanup(engine, [tenant_a])

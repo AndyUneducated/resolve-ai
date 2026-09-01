@@ -1,7 +1,7 @@
 """Billing Agent — delegates to the Plan-Execute-Replan sub-graph.
 
-工具白名单：Stripe.* + Zendesk.get_ticket_history / update_ticket
-升级条件：单笔 >= $500 / 怀疑 fraud
+Tool whitelist: Stripe.* + Zendesk.get_ticket_history / update_ticket
+Escalation conditions: a single transaction >= $500 or suspected fraud
 """
 
 from __future__ import annotations

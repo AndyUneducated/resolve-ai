@@ -1,12 +1,14 @@
-"""KB store — 薄封装：直接调 Postgres 全文检索 (ts_rank_cd) + pgvector (cosine)。
+"""KB store: a thin wrapper around Postgres full-text and pgvector retrieval.
 
-不自研索引/打分：
+Use established indexing and scoring:
 - BM25 lexical → `ts_rank_cd(content_tsv, plainto_tsquery('english', :q))`
-  （索引 `kb_tsv_idx` GIN）
-- dense → `embedding <=> :qvec`（cosine 距离，索引 `kb_embedding_idx` HNSW）
+  (GIN index `kb_tsv_idx`)
+- dense → `embedding <=> :qvec` (cosine distance, HNSW index `kb_embedding_idx`)
 
-所有查询强制带 `tenant_id`（对齐 M9 多租户 / 未来 RLS），不提供无租户全库检索。
-向量参数以 pgvector 文本字面量 `'[...]'::vector` 形式绑定，省去逐连接 register_vector。
+Every query requires `tenant_id` for M9 multi-tenancy and future RLS; no
+tenant-free full-database retrieval is provided. Vector parameters are bound
+as pgvector text literals (`'[...]'::vector`), avoiding per-connection
+register_vector setup.
 """
 
 from __future__ import annotations

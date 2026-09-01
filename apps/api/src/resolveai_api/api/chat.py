@@ -1,4 +1,4 @@
-"""聊天入口 — SSE 流式返回 Agent 响应 + tool trace。"""
+"""Chat endpoint that streams agent responses and tool traces over SSE."""
 
 from __future__ import annotations
 
@@ -19,32 +19,37 @@ TenantDep = Annotated[str, Depends(get_tenant_id)]
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., description="客户输入")
-    customer_id: str = Field(..., description="客户 ID — 决策 4 · Layer 4 记忆隔离 key")
+    message: str = Field(..., description="Customer input")
+    customer_id: str = Field(..., description="Customer ID — Decision 4 · Layer 4 memory isolation key")
     thread_id: str | None = Field(
         default=None,
-        description="会话 ID；为空则新建。中断恢复 / 跨班次接力靠它。",
+        description="Session ID; a new session is created when omitted. Used for interruption recovery and cross-shift handoffs.",
     )
-    tenant_id: str | None = Field(default=None, description="租户 ID（多租户隔离）")
+    tenant_id: str | None = Field(default=None, description="Tenant ID (multi-tenant isolation)")
 
 
 @router.post("/chat")
 async def chat(
     req: ChatRequest, supervisor: SupervisorDep, tenant_id: TenantDep
 ) -> EventSourceResponse:
-    """SSE 流：每个 Agent 步骤一个 event。
+    """SSE stream with one event per agent step.
 
-    事件类型（与 `SupervisorGraph.stream` 对齐）：
-    - `agent_step`：某个 Agent 产出一段回复，data = {agent, content, flags, tool_calls}
-    - `blocked`：被护栏拦截（L1 输入 / L3 输出 / L4 跨租户），data = {reason, layer, kind}
-    - `awaiting_approval`：destructive 动作被 HITL 网关挂起待人工审批（M12），
+    Event types (aligned with `SupervisorGraph.stream`):
+    - `agent_step`: an agent produced a response; data = {agent, content, flags, tool_calls}
+    - `blocked`: blocked by a guardrail (L1 input / L3 output / L4 cross-tenant);
+      data = {reason, layer, kind}
+    - `awaiting_approval`: a destructive action was paused by the HITL gateway
+      for human approval (M12);
       data = {thread_ref, pending:[{id, tool, args, ...}]}
-    - `human_owned`：该 thread 已被人工坐席接管（M12），data = {owner, thread_ref}
-    - `done`：本轮结束，data = {tokens, cost_usd, over_budget, guardrail_latency_ms, ...}
+    - `human_owned`: the thread was taken over by a human agent (M12);
+      data = {owner, thread_ref}
+    - `done`: the current turn ended;
+      data = {tokens, cost_usd, over_budget, guardrail_latency_ms, ...}
     """
 
-    # 租户身份统一由 get_tenant_id 解析（无鉴权，demo 回退 DEFAULT_TENANT_ID）；
-    # 请求体里若显式带了 tenant_id 则以它为准，喂给下游 SET LOCAL app.tenant_id。
+    # Tenant identity is resolved by get_tenant_id (without authentication, the
+    # demo falls back to DEFAULT_TENANT_ID). An explicit tenant_id in the request
+    # body takes precedence and is passed downstream to SET LOCAL app.tenant_id.
     resolved_tenant = req.tenant_id or tenant_id
 
     async def event_stream() -> AsyncIterator[dict[str, str]]:

@@ -1,4 +1,4 @@
-"""Smoke test — FastAPI app 能起，health endpoint 正常返回。"""
+"""Smoke test: the FastAPI app starts and the health endpoint responds successfully."""
 
 from __future__ import annotations
 

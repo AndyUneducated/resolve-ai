@@ -1,8 +1,8 @@
--- ResolveAI · Postgres 初始化脚本
+-- ResolveAI · Postgres initialization script
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- 多租户隔离的根表（决策 4 · Layer 4 记忆侧）
+-- Root table for multi-tenant isolation (Decision 4 · Layer 4 memory boundary)
 CREATE TABLE IF NOT EXISTS tenants (
     id           TEXT PRIMARY KEY,
     name         TEXT NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     PRIMARY KEY (tenant_id, id)
 );
 
--- FAQ / runbook / KB 检索（hybrid: BM25 via tsvector + dense via vector）
+-- FAQ / runbook / KB retrieval (hybrid: BM25 via tsvector + dense via vector)
 CREATE TABLE IF NOT EXISTS kb_documents (
     id             BIGSERIAL PRIMARY KEY,
     tenant_id      TEXT NOT NULL,
@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS kb_tsv_idx       ON kb_documents USING GIN (content_t
 CREATE INDEX IF NOT EXISTS kb_embedding_idx ON kb_documents USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS kb_tenant_idx    ON kb_documents (tenant_id);
 
--- LangGraph state checkpoints（Stateful Handoff + 中断恢复）
+-- LangGraph state checkpoints (stateful handoff + interruption recovery)
 CREATE TABLE IF NOT EXISTS agent_checkpoints (
     tenant_id      TEXT NOT NULL,
     customer_id    TEXT NOT NULL,

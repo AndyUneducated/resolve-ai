@@ -1,9 +1,9 @@
-"""Layer 3 · 输出侧 — Presidio re-scan + policy compliance + hallucinated entity detector。
+"""Layer 3 · Output side — Presidio rescan, policy compliance, and hallucinated-entity detection.
 
-防：
-- LLM 把 system prompt / 历史对话 / 跨客户 PII 漏出来
-- 越权承诺（套折扣码 / 编造退款金额超 SLA / 承诺产品没有的功能）
-- 编造订单号 / 交易 ID / 退款金额（用 schema 校验 + 工具返回值 cross-check）
+Protects against:
+- the LLM leaking the system prompt, conversation history, or cross-customer PII
+- unauthorized commitments such as discount codes, refunds beyond the SLA, or nonexistent features
+- fabricated order IDs, transaction IDs, or refund amounts, checked against schemas and tool returns
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ class OutputGuardrail:
     async def scan(
         self, text: str, tool_calls: list[dict[str, object]] | None = None
     ) -> tuple[str, list[str]]:
-        """返回 (清理后文本, flags)。"""
+        """Return (sanitized text, flags)."""
         if not self._enabled:
             return text, []
 
@@ -129,7 +129,7 @@ class OutputGuardrail:
     async def verify_entities(
         self, *, text: str, tool_returns: list[dict[str, object]]
     ) -> list[str]:
-        """Hallucinated entity detector — 文本里出现的 order id / amount 必须能在工具返回里找到。"""
+        """Detect hallucinated entities: order IDs and amounts must appear in tool returns."""
         serialized = json.dumps(tool_returns, default=str)
         misses: list[str] = []
         for pattern in self.ENTITY_PATTERNS.values():

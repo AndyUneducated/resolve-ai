@@ -1,6 +1,6 @@
 """Salesforce Mock MCP Server (real impl using the official `mcp` Python SDK).
 
-工具：
+Tools:
 - get_account(customer_id) → Account                       (capability=read)
 - update_opportunity(opportunity_id, stage?, amount?) → Opp (capability=write)
 

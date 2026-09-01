@@ -1,6 +1,6 @@
 """Slack Mock MCP Server (real impl using the official `mcp` Python SDK).
 
-工具：
+Tools:
 - notify_team(channel, message, mention?) → Message       (capability=write)
 - post_message(channel, message)          → Message       (capability=write)
 

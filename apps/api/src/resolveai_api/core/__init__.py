@@ -1,1 +1,1 @@
-"""共享内核 — LLM 工厂 / Executor / 用量+成本 / Checkpointer / 预算，所有 Agent 共享。"""
+"""Shared core for the LLM factory, Executor, usage and cost, Checkpointer, and budgets."""

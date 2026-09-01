@@ -4,7 +4,7 @@ Designed to exercise every Billing branch:
 - charges < $500     → safely auto-refundable
 - charges >= $500    → Billing must propose escalation
 - already-refunded   → refund() must error out (cross-check requirement)
-- duplicate charges  → ticket "我被扣了两次" demo
+- duplicate charges  → "I was charged twice" ticket demo
 """
 
 from __future__ import annotations
